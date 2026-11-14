@@ -38,8 +38,9 @@
             <input id="start-utc-timestamp" type="hidden" name="start-utc-timestamp" value="{{ start_utc_timestamp or '' }}" />
             <input id="end-utc-timestamp" type="hidden" name="end-utc-timestamp" value="{{ end_utc_timestamp or '' }}" />
 
-            <div class="col-md-2 d-grid">
+            <div class="col-md-2 d-grid gap-2">
               <button type="submit" class="btn btn-primary">Show chart</button>
+              <button type="submit" class="btn btn-outline-secondary" formaction="{{ url_for('water_meter_history_download') }}" formmethod="get">Download</button>
             </div>
           </form>
         </div>

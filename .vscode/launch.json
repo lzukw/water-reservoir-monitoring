@@ -60,12 +60,13 @@
             "type": "debugpy",
             "request": "launch",
             "module": "website",
-            "cwd": "${workspaceFolder}",
+            "cwd": "${workspaceFolder}/flask-website",
             "console": "integratedTerminal",
             "args": [
                 "--camera-images-folder=${workspaceFolder}/data/camera-images",
                 "--water-level-csv-file=${workspaceFolder}/data/water-level/sensor-data.csv",
                 "--water-meter-csv-file=${workspaceFolder}/data/water-meter/sensor-data.csv",
+                "--redis-server=127.0.0.1",
                 "--log-level=DEBUG",
             ]
         },

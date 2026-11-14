@@ -1,0 +1,5 @@
+[Network]
+NetworkName=redis-network
+Driver=bridge
+IPv6=true
+

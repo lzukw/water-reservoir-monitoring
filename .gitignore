@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.venv
+venv/
+env/
+.ipynb_checkpoints/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Runtime data: camera images (keep the camera-* folders, ignore their contents)
+data/camera-images/camera-*/*
+!data/camera-images/camera-*/.gitkeep
+
+# Runtime data: sensor value CSVs (keep the folders, ignore their contents)
+data/water-level/*
+!data/water-level/.gitkeep
+data/water-meter/*
+!data/water-meter/.gitkeep

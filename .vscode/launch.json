@@ -1,0 +1,75 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+    
+        {
+            "name": "Python Debugger: Current File with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "args": ["${command:pickArgs}"]
+        },
+
+        {
+            "name": "Python Debugger: Package camera with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "camera",
+            "cwd": "${workspaceFolder}/camera",
+            "console": "integratedTerminal",
+            "args": ["${command:pickArgs}"]
+        },
+
+        {
+            "name": "Python Debugger: Package water_meter with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "water_meter",
+            "cwd": "${workspaceFolder}/water-meter",
+            "console": "integratedTerminal",
+            "args": [
+                "--log-level=DEBUG",
+                "--rois=[[10,10,8,8],[20,10,8,8],[30,10,8,8],[40,10,8,8],[50,10,8,8],[60,10,8,8]]"
+            ]
+        },
+
+        {
+            "name": "Python Debugger: Package data_collector with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "data_collector",
+            "cwd": "${workspaceFolder}/data-collector",
+            "console": "integratedTerminal",
+            "args": [
+                "--camera-images-folder=${workspaceFolder}/data/camera-images",
+                "--water-level-csv-file=${workspaceFolder}/data/water-level/sensor-data.csv",
+                "--water-meter-csv-file=${workspaceFolder}/data/water-meter/sensor-data.csv",
+                "--camera-cron-expression=* * * * *",
+                "--water-level-cron-expression=* * * * *",
+                "--water-meter-cron-expression=* * * * *",
+                "--log-level=DEBUG",
+            ]
+        },
+
+        {
+            "name": "Python Debugger: Package website with Arguments",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "website",
+            "cwd": "${workspaceFolder}",
+            "console": "integratedTerminal",
+            "args": [
+                "--camera-images-folder=${workspaceFolder}/data/camera-images",
+                "--water-level-csv-file=${workspaceFolder}/data/water-level/sensor-data.csv",
+                "--water-meter-csv-file=${workspaceFolder}/data/water-meter/sensor-data.csv",
+                "--log-level=DEBUG",
+            ]
+        },
+
+
+    ]
+}

@@ -1,0 +1,17 @@
+[Unit]
+Description=Redis Server Container
+After=network-online.target
+
+[Container]
+Image=docker.io/library/redis:latest
+ContainerName=redis-server
+PublishPort=0.0.0.0:6379:6379
+PublishPort=[::]:6379:6379
+Network=water-reservoir-podman.network
+
+[Service]
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+

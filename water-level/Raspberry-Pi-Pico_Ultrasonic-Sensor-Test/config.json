@@ -1,0 +1,13 @@
+{
+    "hostname": "rpi-pico-water-level",  
+    "ap_ssid_prefix": "RPico-Water-Level-",
+    "ap_password": "1234567890",
+    "station_ssid": "YourSSID",
+    "station_password": "YourPassword",
+    "redis_server": "redis-server-hostname",
+    "redis_port": 6379,
+    "redis_key": "water-level",
+    "redis_hashkey_timestamp": "timestamp",
+    "redis_hashkey_value": "value",
+    "distance_to_bottom": 525
+}

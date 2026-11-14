@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container py-4">
+      <header class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+          <p class="text-uppercase text-muted mb-1">Reservoir monitoring</p>
+          <h1 class="h2 mb-0">Live video</h1>
+        </div>
+        <a href="{{ url_for('dashboard', camera=selected_camera) }}" class="btn dashboard-back-button">Back to dashboard</a>
+      </header>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <form method="get" action="{{ url_for('camera_live_video') }}" class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label for="camera-select" class="form-label">Camera</label>
+              <select id="camera-select" name="camera" class="form-select" onchange="this.form.submit()">
+                {% for camera in camera_numbers %}
+                <option value="{{ camera }}" {% if camera == selected_camera %}selected{% endif %}>Camera {{ camera }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label for="duration-input" class="form-label">Video duration (s)</label>
+              <input id="duration-input" name="duration" type="number" min="1" max="60" step="1" value="{{ duration_seconds }}" class="form-control" />
+              <div class="form-text">Default: 5, max: 60</div>
+            </div>
+
+            <div class="col-md-4 d-grid d-md-flex justify-content-md-end">
+              <button id="download-and-play-button" type="button" class="btn btn-primary">Download and Play</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Camera {{ selected_camera }}</h2>
+
+          {% if preview_available %}
+          <video
+            id="live-video-player"
+            class="live-video-player"
+            controls
+            preload="none"
+            poster="{{ url_for('latest_image', camera=selected_camera) }}"
+          >
+            Your browser does not support the video tag.
+          </video>
+          <div class="timestamp-value mt-2" data-local-timestamp="{{ preview_timestamp or '' }}">Preview timestamp: <span>{{ preview_timestamp }}</span></div>
+          {% else %}
+          <video id="live-video-player" class="live-video-player" controls preload="none">
+            Your browser does not support the video tag.
+          </video>
+          <div class="small text-muted mt-2">No preview image available.</div>
+          {% endif %}
+
+          <div id="live-video-status" class="small text-muted mt-3">
+            Press 'Download and Play' to generate and load a new video.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        document.querySelectorAll('[data-local-timestamp]').forEach((element) => {
+          const rawValue = element.dataset.localTimestamp;
+          if (!rawValue) {
+            return;
+          }
+
+          const date = new Date(rawValue);
+          if (Number.isNaN(date.getTime())) {
+            return;
+          }
+
+          const valueElement = element.querySelector('span');
+          if (valueElement) {
+            valueElement.textContent = date.toLocaleString();
+          }
+        });
+
+        const downloadAndPlayButton = document.getElementById("download-and-play-button");
+        const cameraSelect = document.getElementById("camera-select");
+        const durationInput = document.getElementById("duration-input");
+        const player = document.getElementById("live-video-player");
+        const status = document.getElementById("live-video-status");
+        const streamBaseUrl = "{{ url_for('camera_live_video_stream') }}";
+
+        function clampDuration(rawValue) {
+          const parsed = parseInt(rawValue, 10);
+          if (Number.isNaN(parsed)) {
+            return 5;
+          }
+          if (parsed < 1) {
+            return 1;
+          }
+          if (parsed > 60) {
+            return 60;
+          }
+          return parsed;
+        }
+
+        downloadAndPlayButton.addEventListener("click", async function () {
+          const camera = cameraSelect.value;
+          const duration = clampDuration(durationInput.value);
+          durationInput.value = String(duration);
+
+          downloadAndPlayButton.disabled = true;
+          status.textContent = "Generating video. This can take several seconds...";
+
+          const streamUrl = `${streamBaseUrl}?camera=${encodeURIComponent(camera)}&duration=${encodeURIComponent(duration)}&t=${Date.now()}`;
+
+          player.pause();
+          player.removeAttribute("src");
+          player.load();
+          player.src = streamUrl;
+
+          try {
+            await player.play();
+            status.textContent = "Playing generated live video.";
+          } catch (_err) {
+            status.textContent = "Video is loading. Press play in the player if autoplay is blocked.";
+          } finally {
+            downloadAndPlayButton.disabled = false;
+          }
+        });
+      })();
+    </script>
+  </body>
+</html>

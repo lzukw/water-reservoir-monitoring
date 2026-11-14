@@ -1,0 +1,16 @@
+[Unit]
+Description=Flask website service for Water Reservoir Monitoring
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+# Adjust path and commandline-arguments!
+WorkingDirectory=/home/pi/water-reservoir-monitoring/flask-website
+ExecStart=/usr/bin/env python3 -m website --flask-host="::" --flask-port=5000 --redis-server=127.0.0.1 --camera-images-folder=/home/pi/water-reservoir-monitoring/data/camera-images --water-level-csv-file=/home/pi/water-reservoir-monitoring/data/water-level/sensor-data.csv --water-meter-csv-file=/home/pi/water-reservoir-monitoring/data/water-meter/sensor-data.csv --log-level=INFO
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

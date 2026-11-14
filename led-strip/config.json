@@ -1,0 +1,12 @@
+{
+    "hostname":"rpi-pico-led-strip-1",
+    
+    "ap_ssid_prefix":"RPi-Pico-led-strip",
+    "ap_password":"1234567890",
+
+    "station_ssid":"Your SSID",
+    "station_password":"Your Password",
+    
+    "ledCount": 20,
+    "ledBrightness": 10
+}

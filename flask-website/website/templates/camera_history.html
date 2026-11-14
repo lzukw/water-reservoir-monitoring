@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ page_title }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  </head>
+  <body>
+    <div class="container py-4">
+      <header class="d-flex flex-column flex-md-row justify-content-between align-items-md-center mb-4 gap-3">
+        <div>
+          <p class="text-uppercase text-muted mb-1">Reservoir monitoring</p>
+          <h1 class="h2 mb-0">History</h1>
+        </div>
+        <a href="{{ url_for('dashboard') }}" class="btn dashboard-back-button">Back to dashboard</a>
+      </header>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <form method="get" action="{{ url_for('camera_history', camera=selected_camera) }}" class="row g-3 align-items-end">
+            <div class="col-md-4">
+              <label for="camera-select" class="form-label">Camera</label>
+              <select id="camera-select" name="camera" class="form-select" onchange="this.form.submit()">
+                {% for camera in camera_numbers %}
+                <option value="{{ camera }}" {% if camera == selected_camera %}selected{% endif %}>Camera {{ camera }}</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <div class="col-md-4">
+              <label for="date-input" class="form-label">Date</label>
+              <input id="date-input" type="date" name="date" class="form-control" value="" />
+            </div>
+
+            <div class="col-md-4">
+              <label for="hour-select" class="form-label">Hour</label>
+              <select id="hour-select" name="hour" class="form-select">
+                {% for hour in range(24) %}
+                <option value="{{ '%02d'|format(hour) }}">{{ '%02d'|format(hour) }}:00</option>
+                {% endfor %}
+              </select>
+            </div>
+
+            <input id="selected-utc-timestamp" type="hidden" name="selected-utc-timestamp" value="{{ utc_time_to_select or '' }}" />
+
+            <div class="col-12">
+              <button type="submit" class="btn btn-primary">Show image</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      {% if image_filename %}
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Closest image for Camera {{ selected_camera }}</h2>
+          <img src="{{ url_for('image_by_filename', camera=selected_camera, filename=image_filename) }}" class="img-fluid rounded border dashboard-image" alt="Closest image for camera {{ selected_camera }}" />
+          <div class="small text-muted mt-2">Filename: {{ image_filename }}</div>
+          <div id="local-image-timestamp" class="timestamp-value mt-2" data-local-timestamp="{{ image_timestamp or '' }}">Time: <span>{{ image_timestamp or 'n/a' }}</span></div>
+        </div>
+      </div>
+      {% else %}
+      <div data-local-timestamp="{{ image_timestamp or '' }}" class="placeholder-panel d-flex align-items-center justify-content-center text-center text-muted">
+        <p>No image available for Camera {{ selected_camera }} on <span>{{ utc_time_to_select or 'n/a' }}</span>.</p>
+      </div>
+      {% endif %}
+    </div>
+    <script>
+      (function () {
+        document.querySelectorAll('[data-local-timestamp]').forEach((element) => {
+          const rawValue = element.dataset.localTimestamp;
+          if (!rawValue) {
+            return;
+          }
+
+          const date = new Date(rawValue);
+          if (Number.isNaN(date.getTime())) {
+            return;
+          }
+
+          const valueElement = element.querySelector('span');
+          if (valueElement) {
+            valueElement.textContent = date.toLocaleString();
+          }
+        });
+        
+        const dateInput = document.getElementById('date-input');
+        const hourSelect = document.getElementById('hour-select');
+        const hiddenUtcTimestamp = document.getElementById('selected-utc-timestamp');
+
+        if (hiddenUtcTimestamp && hiddenUtcTimestamp.value && dateInput && hourSelect) {
+          const localDate = new Date(hiddenUtcTimestamp.value);
+          if (!Number.isNaN(localDate.getTime())) {
+            const year = localDate.getFullYear();
+            const month = String(localDate.getMonth() + 1).padStart(2, '0');
+            const day = String(localDate.getDate()).padStart(2, '0');
+            dateInput.value = `${year}-${month}-${day}`;
+            hourSelect.value = String(localDate.getHours()).padStart(2, '0');
+          }
+        }
+
+        const form = document.querySelector('form');
+        if (!form) {
+          return;
+        }
+
+        if (!hiddenUtcTimestamp) {
+          return;
+        }
+
+        form.addEventListener('submit', function () {
+          if (!dateInput || !hourSelect) {
+            return;
+          }
+
+          const dateValue = dateInput.value;
+          const hourValue = hourSelect.value;
+
+          if (!dateValue || !hourValue) {
+            hiddenUtcTimestamp.value = '';
+            return;
+          }
+
+          const localDate = new Date(`${dateValue}T${hourValue}:00:00`);
+          if (Number.isNaN(localDate.getTime())) {
+            hiddenUtcTimestamp.value = '';
+            return;
+          }
+
+          const utcIso = new Date(Date.UTC(
+            localDate.getUTCFullYear(),
+            localDate.getUTCMonth(),
+            localDate.getUTCDate(),
+            localDate.getUTCHours(),
+            localDate.getUTCMinutes(),
+            localDate.getUTCSeconds()
+          )).toISOString();
+
+          hiddenUtcTimestamp.value = utcIso;
+        });
+      })();
+    </script>
+  </body>
+</html>

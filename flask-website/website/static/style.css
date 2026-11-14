@@ -1,0 +1,110 @@
+:root {
+  --bg-color: #f4f7fb;
+  --panel-color: #ffffff;
+  --accent: #0d6efd;
+  --accent-soft: rgba(13, 110, 253, 0.08);
+  --text-muted: #6c757d;
+  --shadow: 0 0.5rem 1rem rgba(15, 23, 42, 0.08);
+  --success: #198754;
+  --danger: #dc3545;
+}
+
+body {
+  background: linear-gradient(180deg, #edf3ff 0%, var(--bg-color) 100%);
+  color: #111827;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.card {
+  border: 0;
+  border-radius: 1rem;
+  background: var(--panel-color);
+  box-shadow: var(--shadow);
+}
+
+.card-body {
+  padding: 1.25rem;
+}
+
+.dashboard-image {
+  width: 100%;
+  min-height: 320px;
+  object-fit: cover;
+  background: #e9ecef;
+}
+
+.placeholder-panel {
+  min-height: 320px;
+  border: 1px dashed rgba(108, 117, 125, 0.4);
+  border-radius: 0.75rem;
+  background: rgba(108, 117, 125, 0.03);
+}
+
+.metric-value {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.timestamp-value {
+  font-size: clamp(1rem, 1.2vw, 2rem);
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.stream-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 160px;
+  padding: 1rem;
+  text-align: center;
+  color: var(--text-muted);
+  background: rgba(108, 117, 125, 0.05);
+}
+
+.live-video-player {
+  width: 100%;
+  min-height: 320px;
+  border-radius: 0.75rem;
+  background: #0b1220;
+  border: 1px solid rgba(13, 110, 253, 0.2);
+}
+
+.dashboard-back-button {
+  background: linear-gradient(135deg, var(--accent) 0%, #0b5ed7 100%);
+  border: 1px solid var(--accent);
+  border-radius: 0.75rem;
+  color: #ffffff;
+  font-weight: 600;
+  padding: 0.75rem 1.1rem;
+  box-shadow: 0 0.5rem 1rem rgba(13, 110, 253, 0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.dashboard-back-button:hover,
+.dashboard-back-button:focus-visible {
+  background: linear-gradient(135deg, #0b5ed7 0%, #0a4fb7 100%);
+  border-color: #0a4fb7;
+  color: #ffffff;
+  box-shadow: 0 0.75rem 1.25rem rgba(13, 110, 253, 0.25);
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+.dashboard-back-button:focus-visible {
+  outline: 0.2rem solid rgba(13, 110, 253, 0.25);
+  outline-offset: 0.15rem;
+}
+
+@media (max-width: 767.98px) {
+  .card-body {
+    padding: 1rem;
+  }
+
+  .dashboard-image,
+  .placeholder-panel,
+  .live-video-player {
+    min-height: 220px;
+  }
+}

@@ -8,7 +8,7 @@ User=pi
 Group=pi
 # Adjust path and commandline-arguments!
 WorkingDirectory=/home/pi/water-reservoir-monitoring/water-meter
-ExecStart=/usr/bin/env python3 -m water_meter --wrap-around-value=1000000.0 --camera-number=0 --redis-server=main-raspberry-pi --rois='[[10,10,8,8],[20,10,8,8],[30,10,8,8],[40,10,8,8],[50,10,8,8],[60,10,8,8]]' --log-level=INFO
+ExecStart=/usr/bin/env python3 -m water_meter --wrap-around-value=1000000.0 --approx-daily-consumption=200.0 --camera-number=0 --store-camera-number=2 --redis-server=127.0.0.1  --log-level=INFO
 Restart=always
 RestartSec=5
 

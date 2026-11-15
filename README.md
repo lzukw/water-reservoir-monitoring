@@ -108,7 +108,7 @@ Some python-processes need special python-libraries, which are available in the 
 
 ```sh
 sudo apt update
-sudo apt install -y python3-redis python3-opencv python3-croniter python3-flask
+sudo apt install -y python3-redis python3-opencv python3-croniter python3-flask python3-openpyxl
 ```
 
 ### Updades and regular reboots

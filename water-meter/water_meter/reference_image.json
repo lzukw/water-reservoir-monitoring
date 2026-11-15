@@ -1,0 +1,4 @@
+{
+    "reference_image_filepath" : "./water_meter/water-meter-reference-image.jpg",
+    "roi" : [120, 171, 499, 125]
+}

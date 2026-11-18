@@ -330,6 +330,45 @@ def camera_history():
     )
 
 
+@app.route("/camera/history/download")
+def camera_history_download():
+    """Download all images of the selected camera between the start and end
+    timestamp as a zip-file. The camera is taken from the 'camera' GET parameter,
+    the timestamps from the 'start-utc-timestamp' and 'end-utc-timestamp' GET
+    parameters (UTC, ISO 8601; default: last 24 hours)."""
+    camera_numbers = camera_data.get_camera_numbers()
+    if not camera_numbers:
+        return "No camera available", 404
+
+    requested_camera = request.args.get("camera", default=str(camera_numbers[0]))
+    try:
+        camera_number = int(requested_camera)
+    except (TypeError, ValueError):
+        return "Invalid camera", 400
+    if camera_number not in camera_numbers:
+        return "Camera not available", 404
+
+    start_dt, end_dt = parse_utc_timestamp_range(
+        request.args.get("start-utc-timestamp"),
+        request.args.get("end-utc-timestamp"),
+    )
+
+    zip_bytes = camera_data.create_zip_of_images(camera_number, start_dt, end_dt)
+    if zip_bytes is None:
+        return "No images available for the selected camera and period", 404
+
+    download_name = (
+        f"camera-{camera_number}-images_{convert_to_isoformat_with_z(start_dt)}"
+        f"_{convert_to_isoformat_with_z(end_dt)}.zip"
+    )
+    return send_file(
+        io.BytesIO(zip_bytes),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name=download_name,
+    )
+
+
 @app.route("/camera/live-video")
 def camera_live_video():
     camera_numbers = camera_data.get_camera_numbers()

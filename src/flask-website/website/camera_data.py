@@ -1,8 +1,10 @@
+import io
 import logging
 import os
 import sys
 import tempfile
 import time
+import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -88,13 +90,14 @@ class CameraData:
                 camera_numbers.append(camera_number)
         return camera_numbers
 
-    def _get_image_filepaths_for_camera(self, camera_number: int) -> list[Path]:
-        """Return a list of Path objects for all image files in the camera folder, sorted by filename."""
+    def _get_image_files_with_timestamps(self, camera_number: int) -> list[tuple[datetime, Path]]:
+        """Return a list of (timestamp, filepath) tuples for all image files in the camera
+        folder, sorted by timestamp. The timestamp is parsed from the filename."""
         camera_folder = self._get_image_folder(camera_number)
         if not camera_folder or not camera_folder.exists():
             return []
 
-        image_files: list[Path] = []
+        image_files: list[tuple[datetime, Path]] = []
         for filepath in camera_folder.iterdir():
             if not filepath.is_file():
                 continue
@@ -107,10 +110,14 @@ class CameraData:
             except ValueError:
                 # Don't include files that don't match the expected filename format
                 continue
-            image_files.append(filepath)
+            image_files.append((image_timestamp, filepath))
 
-        image_files.sort()
+        image_files.sort(key=lambda item: item[0])
         return image_files
+
+    def _get_image_filepaths_for_camera(self, camera_number: int) -> list[Path]:
+        """Return a list of Path objects for all image files in the camera folder, sorted by filename."""
+        return [filepath for _, filepath in self._get_image_files_with_timestamps(camera_number)]
 
     def get_latest_image_from_filesystem(self, camera_number: int) -> Path | None:
         """Rerturn the lastest image for a given camera_number, or None if no image is 
@@ -208,6 +215,39 @@ class CameraData:
         except Exception as e:  # noqa: BLE001
             self._logger.error(f"Error reading image file '{file_path}': {e}")
             return None
+
+    def create_zip_of_images(self, camera_number: int, start_timestamp: datetime, end_timestamp: datetime) -> bytes | None:
+        """Create a zip-file containing all images of the given camera whose timestamp is
+        between start_timestamp and end_timestamp (inclusive), and return it as bytes.
+        Returns None if no images are available in the given range. Naive timestamps are
+        assumed to be UTC; if end_timestamp is before start_timestamp, the two are swapped."""
+        if start_timestamp.tzinfo is None:
+            start_timestamp = start_timestamp.replace(tzinfo=UTC)
+        if end_timestamp.tzinfo is None:
+            end_timestamp = end_timestamp.replace(tzinfo=UTC)
+        if end_timestamp < start_timestamp:
+            start_timestamp, end_timestamp = end_timestamp, start_timestamp
+
+        selected_images = [
+            (timestamp, filepath)
+            for timestamp, filepath in self._get_image_files_with_timestamps(camera_number)
+            if start_timestamp <= timestamp <= end_timestamp
+        ]
+        if not selected_images:
+            self._logger.warning(
+                f"No images for camera {camera_number} between {start_timestamp} and {end_timestamp}"
+            )
+            return None
+
+        buffer = io.BytesIO()
+        with zipfile.ZipFile(buffer, "w") as zip_file:
+            for _, filepath in selected_images:
+                zip_file.write(filepath, arcname=filepath.name)
+        self._logger.info(
+            f"Created zip with {len(selected_images)} image(s) for camera {camera_number} "
+            f"between {start_timestamp} and {end_timestamp}"
+        )
+        return buffer.getvalue()
 
     def create_video_from_redis(self, camera_number: int, duration_in_seconds: float) -> Path | None:
         """Create a video from the images stored in Redis for the given camera_number.

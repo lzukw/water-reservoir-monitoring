@@ -52,6 +52,35 @@
         </div>
       </div>
 
+      <div class="card shadow-sm mb-4">
+        <div class="card-body">
+          <h2 class="h5 mb-3">Download images</h2>
+          <form id="download-form" method="get" action="{{ url_for('camera_history_download') }}" class="row g-3 align-items-end">
+            <input type="hidden" name="camera" value="{{ selected_camera }}" />
+
+            <div class="col-md-5">
+              <label for="download-start-input" class="form-label">Start (local time)</label>
+              <input id="download-start-input" type="datetime-local" class="form-control" value="" />
+            </div>
+
+            <div class="col-md-5">
+              <label for="download-end-input" class="form-label">End (local time)</label>
+              <input id="download-end-input" type="datetime-local" class="form-control" value="" />
+            </div>
+
+            <input id="download-start-utc-timestamp" type="hidden" name="start-utc-timestamp" value="" />
+            <input id="download-end-utc-timestamp" type="hidden" name="end-utc-timestamp" value="" />
+
+            <div class="col-md-2 d-grid">
+              <button type="submit" class="btn btn-outline-secondary">Download</button>
+            </div>
+          </form>
+          <div class="small text-muted mt-2">
+            Creates a zip-file with all images of Camera {{ selected_camera }} between the two selected timestamps (local browser time). If left empty, the last 24 hours are used.
+          </div>
+        </div>
+      </div>
+
       {% if image_filename %}
       <div class="card shadow-sm">
         <div class="card-body">
@@ -139,6 +168,40 @@
           )).toISOString();
 
           hiddenUtcTimestamp.value = utcIso;
+        });
+      })();
+    </script>
+    <script>
+      (function () {
+        const downloadForm = document.getElementById('download-form');
+        if (!downloadForm) {
+          return;
+        }
+
+        const startInput = document.getElementById('download-start-input');
+        const endInput = document.getElementById('download-end-input');
+        const startUtcInput = document.getElementById('download-start-utc-timestamp');
+        const endUtcInput = document.getElementById('download-end-utc-timestamp');
+
+        function localInputToUtcIso(input) {
+          if (!input || !input.value) {
+            return '';
+          }
+          // datetime-local values are interpreted in the local browser time
+          const parsed = new Date(input.value);
+          if (Number.isNaN(parsed.getTime())) {
+            return '';
+          }
+          return parsed.toISOString();
+        }
+
+        downloadForm.addEventListener('submit', function () {
+          if (startUtcInput) {
+            startUtcInput.value = localInputToUtcIso(startInput);
+          }
+          if (endUtcInput) {
+            endUtcInput.value = localInputToUtcIso(endInput);
+          }
         });
       })();
     </script>

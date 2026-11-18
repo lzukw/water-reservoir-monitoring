@@ -189,7 +189,7 @@ $
 
 ```sh
 cd /home/pi
-git clone TODO
+git clone https://github.com/lzukw/water-reservoir-monitoring.git
 ```
 
 ### Data-Collector service on main-raspberry-pi

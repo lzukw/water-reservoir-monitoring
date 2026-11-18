@@ -25,7 +25,7 @@ if ! command -v redis-server >/dev/null 2>&1; then
     echo "    sudo systemctl disable --now redis-server"
     echo
     echo "Then run this script again."
-    exit 1
+    exit 1md
 fi
 
 # Start in foreground (as background job of this script), all settings via CLI args only.

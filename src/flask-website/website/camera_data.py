@@ -18,17 +18,17 @@ __all__ = ["CameraData"]
 
 class CameraData:
 
-    def __init__(self, 
+    def __init__(self,
                  redis_server: str = "127.0.0.1",
                  redis_port: int = 6379,
                  redis_key_camera: str = "cam",
                  redis_hashkey_timestamp: str = "timestamp",
                  redis_hashkey_value: str = "value",
-                 camera_images_folder: Path = Path("../../data/camera-images"), 
-                 camera_images_subfolder_prefix: str = "camera-", 
+                 camera_images_folder: Path = Path("../../data/camera-images"),
+                 camera_images_subfolder_prefix: str = "camera-",
                  log_level: str = "INFO"
                 ):
-        
+
         self._redis_server : str = redis_server
         self._redis_port : int = redis_port
         self._redis_key_camera: str = redis_key_camera
@@ -71,7 +71,7 @@ class CameraData:
                 self._logger.error(f"[REDIS] Error while reading camera data from Redis for camera {camera_number}: {e}")
 
     def _try_get_image_folder(self, camera_number: int) -> Path:
-        return Path(self._camera_images_folder) / f"{self._camera_images_subfolder_prefix}{camera_number}" 
+        return Path(self._camera_images_folder) / f"{self._camera_images_subfolder_prefix}{camera_number}"
 
     def _get_image_folder(self, camera_number : int) -> Path | None:
         p = self._try_get_image_folder(camera_number)
@@ -120,7 +120,7 @@ class CameraData:
         return [filepath for _, filepath in self._get_image_files_with_timestamps(camera_number)]
 
     def get_latest_image_from_filesystem(self, camera_number: int) -> Path | None:
-        """Rerturn the lastest image for a given camera_number, or None if no image is 
+        """Rerturn the lastest image for a given camera_number, or None if no image is
         available. The images are fetched from the local filesystem, not from Redis."""
         camera_folder = self._get_image_folder(camera_number)
         if not camera_folder or not camera_folder.exists():
@@ -129,11 +129,11 @@ class CameraData:
         image_files = self._get_image_filepaths_for_camera(camera_number)
         if not image_files:
             return None
-        
+
         return image_files[-1]
 
     def get_latest_image_from_redis(self, camera_number: int) -> tuple[datetime,bytes] | None:
-        """Return the timestamp and image bytes for the latest image for a given camera_number from Redis, 
+        """Return the timestamp and image bytes for the latest image for a given camera_number from Redis,
         or None if no image is available."""
         try:
             camera_data = self._redis_client.hgetall(f"{self._redis_key_camera}:{camera_number}")
@@ -165,7 +165,7 @@ class CameraData:
 
     def get_closest_image_from_filesystem(self, camera_number: int, timestamp: datetime) -> tuple[datetime, Path] | None:
         """Return the image for a given camera_number and timestamp, or None if no image is available.
-        The fetched image is from the local filesystem. The returned image is the one closest to the 
+        The fetched image is from the local filesystem. The returned image is the one closest to the
         given timestamp."""
         camera_folder = self._get_image_folder(camera_number)
         if not camera_folder or not camera_folder.exists():
@@ -200,7 +200,7 @@ class CameraData:
         return closest_image_timestamp, closest_image_file
 
     def get_image_bytes(self, camera_number: int, filename: str) -> bytes | None:
-        """Return the image bytes for the image file given by its filename and the camera_mumber, or 
+        """Return the image bytes for the image file given by its filename and the camera_mumber, or
         None if the file does not exist."""
         cam_images_folder = self._get_image_folder(camera_number)
         if not cam_images_folder:
@@ -258,7 +258,7 @@ class CameraData:
 
         frames: list[tuple[datetime, np.ndarray]] = []
         seen_timestamps: set[datetime] = set()
-        
+
 
         end_time = time.monotonic() + duration_in_seconds
         while time.monotonic() < end_time:
@@ -279,7 +279,7 @@ class CameraData:
                 self._logger.warning(f"Failed to decode image bytes for camera {camera_number} at {timestamp}")
                 time.sleep(0.03)
                 continue
-        
+
             frames.append((timestamp, frame))
             time.sleep(0.03)
 
@@ -329,9 +329,9 @@ if __name__ == "__main__":
     camera_numbers = camera_data.get_camera_numbers()
     print("Available camera numbers:", camera_numbers)
     assert len(camera_numbers) > 0, "No camera numbers found. Please ensure that the camera images folder contains subfolders for cameras."
-    
+
     camera_number = camera_numbers[0]
-    
+
     latest_image = camera_data.get_latest_image_from_filesystem(0)
     print(f"Latest image for camera {camera_number}: '{latest_image}'")
     latest_image_from_redis = camera_data.get_latest_image_from_redis(camera_number)
@@ -339,7 +339,7 @@ if __name__ == "__main__":
         timestamp, image_bytes = latest_image_from_redis
         print(f"Latest image from Redis for camera {camera_number}: timestamp='{timestamp}', image_bytes={len(image_bytes)} bytes")
     else:
-        print(f"No image available for camera {camera_number} in Redis")  
+        print(f"No image available for camera {camera_number} in Redis")
 
     search_for_timestamp = datetime.now(UTC)-timedelta(days=5)
     closest_image = camera_data.get_closest_image_from_filesystem(camera_number, search_for_timestamp)
@@ -351,7 +351,7 @@ if __name__ == "__main__":
         assert exact_image_bytes is not None, f"Failed to read image bytes for '{image_filename}'"
     else:
         print(f"No closest image found for camera {camera_number} to current time")
-    
+
     video_path = camera_data.create_video_from_redis(camera_number, duration_in_seconds=5.0)
     if video_path:
         print(f"Video created from Redis images for camera {camera_number}: '{video_path}'")
@@ -362,4 +362,4 @@ if __name__ == "__main__":
             video_path.unlink()
             print(f"Deleted video file '{video_path}'")
         except OSError as e:
-            print(f"Failed to delete video file '{video_path}': {e}") 
+            print(f"Failed to delete video file '{video_path}': {e}")

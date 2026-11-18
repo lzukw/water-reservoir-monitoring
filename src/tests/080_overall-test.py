@@ -523,6 +523,9 @@ def verify_csv_file(csv_path: Path, name: str, min_rows: int) -> list[str]:
                 failures.append(f"{name}: CSV row with wrong column count: {row}")
                 continue
             ts, value_str = row
+            if not ts or not value_str:
+                failures.append(f"{name}: CSV row with empty values: {row}")
+                continue
             try:
                 datetime.fromisoformat(ts)
                 float(value_str)

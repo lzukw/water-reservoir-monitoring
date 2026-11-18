@@ -70,11 +70,11 @@ Each key is a Redis hash with two fields (`timestamp`, `value` by default):
 
 ## Integration test
 
-`src/tests/test_water-meter_module.py` runs the whole chain locally: it starts its own redis-server on localhost, stores a water-meter photo as `cam:0`, starts the module as a subprocess, displays the resulting `cam:2` digits-image and prints the `water-meter` value from Redis until a duration elapses:
+`src/tests/040_test_water_meter_module.py` runs the whole chain locally: it starts its own redis-server on localhost, stores a water-meter photo as `cam:0`, starts the module as a subprocess, displays the resulting `cam:2` digits-image and prints the `water-meter` value from Redis until a duration elapses:
 
 ```bash
 cd path/to/water-reservoir-monitoring
-.venv/bin/python src/tests/test_water-meter_module.py --duration 30
+.venv/bin/python src/tests/040_test_water_meter_module.py --duration 30
 ```
 
 ## Experiments

@@ -1,0 +1,16 @@
+[Unit]
+Description=Dummy Water-Level service
+After=multi-user.target
+
+[Service]
+Type=simple
+# Adjust User ans Group
+User=
+Group=
+# Adjust path and commandline-arguments!
+ExecStart=/usr/bin/env python3 /path/to/water-reservoir-monitoring/src/water-level/dummy_linux_water-level.py --redis-server=127.0.0.1 --log-level=info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

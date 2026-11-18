@@ -40,6 +40,8 @@ Other Raspberry Pi Pico devices are connected to LED strips and control the back
 
 ## File- and Folder-structure in this repository
 
+All source-code is in the folder `src`; runtime data (camera images, sensor CSV-files) is in the folder `data` at the repository root.
+
 ### Folder `redis`
 
 How to setup the redis-database on the Main-Raspberry-Pi. The redis-database is used as central Data-Exchange-point between all processes and devices.
@@ -52,25 +54,25 @@ Here are quadlet-files to start Microservices in Containers (e.g Redis-Database)
 
 Here are instructions to install Redis directly on the Main-Raspberry-Pi with `apt install redis-server` and configure it.
 
-### Folder `camera`
+### Folder `src/camera`
 
 Contains the python-file for a Camera-Process, which captures camera-images and stores them in a redis-database.
 
 There is also a dummy-camera-python-process, and systemd-service-unit-files. for letting systemd manage the processes
 
-### Folder `water-meter`
+### Folder `src/water-meter`
 
 Contains a python-Process for continously reading the water meter value from the camera image (fetched from the redis-database). The meter-value is extraced with image-processing and stored in the Redis-Database.
 
 There is also a systemd-service-unit-file for letting systemd manage the process.
 
-### Folder `water-level`
+### Folder `src/water-level`
 
 - Subfolder `Raspberry_Pi_Pico`: Contains the code for the Raspberry Pi Pico, which is connected to an ultrasonic distance sensor and continuously measures the water level in the reservoir. The measured values are stored in the Redis-Database.
 
 There is also a dummy-process that can be started on a Raspberry Pi, and that stores dummy-water-level-values in the redis-database. This can be used for testing instead of the Raspberry Pi Pico. Also, there is a systemd-service-unit-file for this dummy process.
 
-### Folder led-strip
+### Folder `src/led-strip`
 
 Contains the code for a Raspberry Pi Pico, which is connected to an LED strip and controls the background lighting for the cameras. The LED strip is turned on all the time, and there is no communication with between the Raspberry Pi Picos and the Main-Raspberry-Pi. The colour (R-, G, B- and W-values) of the LED strip can be set by a user via the web-interface, running direktly on the Raspberry Pi Pico.
 
@@ -205,16 +207,13 @@ mkdir -p /home/pi/water-reservoir-monitoring/src
 rsync -av /path/to/water-reservoir-monitoring/ pi@main-raspberry-pi:/home/pi/water-reservoir-monitoring/src/`
 ```
 
-Copy folder `data-collector` to `/home/pi/water-reservoir-monitoring/`, or create a sybolic link:
+The data-collector source-code is already at `/home/pi/water-reservoir-monitoring/src/data-collector/` (copied above).
+
+Create file `/home/pi/water-reservoir-monitoring/water-reservoir-data-collector.service` based on `src/data-collector/water-reservoir-data-collector.service`:
 
 ```sh
-ln -s /home/pi/water-reservoir-monitoring/src/data-collector/ /home/pi/water-reservoir-monitoring/
+cp /home/pi/water-reservoir-monitoring/src/data-collector/water-reservoir-data-collector.service /home/pi/water-reservoir-monitoring/
 ```
-
-Create file `/home/pi/water-reservoir-monitoring/water-reservoir-data-collector.service` based on `data-collector/water-reservoir-data-collector.service`:
-
-```sh
-cp /home/pi/water-reservoir-monitoring/data-collector/water-reservoir-data-collector.service /home/pi/water-reservoir-monitoring/
 
 Create symlink in `/etc/systemd/system/`, then enable and start service:
 
@@ -236,13 +235,9 @@ The main-raspberry-pi also has a pi-camera, connected with a ribbon-cable to the
 rpicam-hello
 ```
 
-Create the folder `/home/pi/water-reservoir-monitoring/camera/camera`, for example with:
+The camera source-code is already at `/home/pi/water-reservoir-monitoring/src/camera/` (copied above).
 
-```sh
-ln -s /home/pi/water-reservoir-monitoring/src/camera/ /home/pi/water-reservoir-monitoring/
-```
-
-Choose Camera-Type to use: DummyCamera, PiCamera or UsbCamera: Edit `/home/pi/water-reservoir-monitoring/camera/camera/__main__.py` and uncomment just one of the three lines under the line `### Select the camera class to use. ...`
+Choose Camera-Type to use: DummyCamera, PiCamera or UsbCamera: Edit `/home/pi/water-reservoir-monitoring/src/camera/camera/__main__.py` and uncomment just one of the three lines under the line `### Select the camera class to use. ...`
 
 Create a file `/home/pi/water-reservoir-monitoring/water-reservoir-pi-cam-0.service`:
 
@@ -254,7 +249,7 @@ cp /home/pi/water-reservoir-monitoring/src/camera/water-reservoir-camera-1.servi
 
 - This file is for Camera 1 (on the cam1-raspberry-pi) and must be slightly changed: As commandline-arguments use `--camera-number 0` and `--redis-server=127.0.0.1`.
 
-- Later, when the service is running and the camera is mounted in its final position, the camera-image can be tested: From another machine `python tests/test_camera_and_redis-receiver.py --camera-number 0 --redis-server=main-raspberry-pi` can be used show the live images and adjust the camera-position.
+- Later, when the service is running and the camera is mounted in its final position, the camera-image can be tested: From another machine `python src/tests/test_camera_and_redis-receiver.py --camera-number 0 --redis-server=main-raspberry-pi` can be used show the live images and adjust the camera-position.
 
 - '--rois-to-mark` is not used anymore, because the Water-Meter-Algorithm finds the position of the ROI containing the water-meter-digits automatically.
 
@@ -285,15 +280,11 @@ main-raspberry-pi:6379> quit
 $
 ```
 
-...or test with `python tests/test_camera_and_redis-receiver.py --camera-number 0 --redis-server=main-raspberry-pi`
+...or test with `python src/tests/test_camera_and_redis-receiver.py --camera-number 0 --redis-server=main-raspberry-pi`
 
 ### Water-meter service on main-raspberry-pi
 
-Copy `water-meter/` to `/home/pi/water-reservoir-monitoring/water-meter/` or create a link:
-
-```sh
-ln -s /home/pi/water-reservoir-monitoring/src/water-meter/ /home/pi/water-reservoir-monitoring/
-```
+The water-meter source-code is already at `/home/pi/water-reservoir-monitoring/src/water-meter/` (copied above).
 
 Create the file `/home/pi/water-reservoir-monitoring/water-reservoir-water-meter.service`:
 
@@ -334,11 +325,7 @@ $
 
 ### Flask-Website on main-raspberry-pi
 
-Copy folder `website/` to `/home/pi/water-reservoir-monitoring/website/` (or create symbolic link):
-
-```sh
-ln -s /home/pi/water-reservoir-monitoring/src/flask-website/ /home/pi/water-reservoir-monitoring/
-```
+The flask-website source-code is already at `/home/pi/water-reservoir-monitoring/src/flask-website/` (copied above).
 
 Create the file `/home/pi/water-reservoir-monitoring/water-reservoir-flask-website.service`:
 
@@ -401,13 +388,13 @@ From a Webbrowser on another device in the same LAN navigate to `http://main-ras
 
 ## LED-Strips
 
-Every Raspberry Pi Pico with an LED-strip can be configured using Wifi and a Webbrowser. See [README.md in Folder led-strip](ledstrip/README.md)
+Every Raspberry Pi Pico with an LED-strip can be configured using Wifi and a Webbrowser. See [README.md in Folder src/led-strip](src/led-strip/README.md)
 
 ## Raspberry Pi Pico with Ultrasonic Distance Sensor
 
 A Raspberry Pi Pico is connected to an ultrasonic distance sensor and continuously measures the water level in the reservoir. The measured values are stored in the Redis-Database under the key `water-level`.
 
-The Raspberry Pi Pico can be configured using Wifi and a Webbrowser. See [README.md in Folder water-level/Raspberry_Pi_Pico](water-level/Raspberry_Pi_Pico/README.md)
+The Raspberry Pi Pico can be configured using Wifi and a Webbrowser. See [README.md in Folder src/water-level](src/water-level/README.md)
 
 ## Raspberry Pi for Camera 1
 

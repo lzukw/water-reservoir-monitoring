@@ -19,7 +19,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "camera",
-            "cwd": "${workspaceFolder}/camera",
+            "cwd": "${workspaceFolder}/src/camera",
             "console": "integratedTerminal",
             "args": ["${command:pickArgs}"]
         },
@@ -29,7 +29,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "water_meter",
-            "cwd": "${workspaceFolder}/water-meter",
+            "cwd": "${workspaceFolder}/src/water-meter",
             "console": "integratedTerminal",
             "args": [
                 "--log-level=DEBUG",
@@ -42,7 +42,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "data_collector",
-            "cwd": "${workspaceFolder}/data-collector",
+            "cwd": "${workspaceFolder}/src/data-collector",
             "console": "integratedTerminal",
             "args": [
                 "--camera-images-folder=${workspaceFolder}/data/camera-images",
@@ -60,7 +60,7 @@
             "type": "debugpy",
             "request": "launch",
             "module": "website",
-            "cwd": "${workspaceFolder}/flask-website",
+            "cwd": "${workspaceFolder}/src/flask-website",
             "console": "integratedTerminal",
             "args": [
                 "--camera-images-folder=${workspaceFolder}/data/camera-images",

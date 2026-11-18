@@ -1,0 +1,16 @@
+[Unit]
+Description=Camera capture service
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+# Adjust path and commandline-arguments!
+WorkingDirectory=/home/pi/water-reservoir-monitoring/src/camera
+ExecStart=/usr/bin/env python3 -m camera --device=0 --redis-server=main-raspberry-pi --camera-number 1 --log-level=info
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

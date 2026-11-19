@@ -6,6 +6,11 @@ After=multi-user.target
 Type=simple
 User=pi
 Group=pi
+# Contain memory usage: if the process exceeds this limit, systemd stops the
+# unit cleanly (and logs 'Memory limit exceeded') instead of the kernel
+# OOM-killer SIGKILLing an arbitrary process on the Raspberry Pi.
+MemoryMax=512M
+OOMPolicy=stop
 # Adjust path and commandline-arguments!
 WorkingDirectory=/home/pi/water-reservoir-monitoring/src/water-meter
 ExecStart=/usr/bin/env python3 -m water_meter --wrap-around-value=1000000.0 --approx-daily-consumption=200.0 --camera-number=0 --store-camera-number=2 --redis-server=127.0.0.1  --log-level=INFO

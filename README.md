@@ -46,7 +46,7 @@ All source-code is in the folder `src`; runtime data (camera images, sensor CSV-
 
 ### Folder `redis`
 
-contains information on how to setup the redis-database on the Main-Raspberry-Pi. The redis-database is used as central Data-Exchange-point between all processes and devices.
+Contains information on how to setup the redis-database on the Main-Raspberry-Pi. The redis-database is used as central Data-Exchange-point between all processes and devices.
 
 **First variant with podman (Folder** `redis-with-podman`**):**
 
@@ -89,7 +89,7 @@ Isntall usefull packages:
 ```sh
 sudo apt update
 sudo apt full-upgrade
-sudo apt install vim net-tools picocom micropython-mpremote avahi-daemon
+sudo apt install vim net-tools picocom micropython-mpremote avahi-daemon zram-tools
 ```
 
 Execute `sudo raspi-config`:
@@ -107,6 +107,14 @@ Execute `sudo raspi-config`:
 Have a look at the files in `/etc/netplan/90-NM-...` One of them is for Ethernet, the other for WLAN. Edit the one for WLAN. Under the line `      dhcp4: true` add (equally indented) the line `      dhcp6: true` (Which also means SLAAC, if no stateful DHCPv6-Server ist available).
 
 Try with `sudo netplan try`. If everything works well: `sudo netplan appy`
+
+Additional Wifis can be added via nmcli:
+
+```sh
+nmcli dev wifi list    # to show available Wifi networks (ssids)
+sudo nmcli connection add con-name <CONNECTION-NAME> type wifi ssid <SSID> wifi-sec.key-mgmt wpa-psk wifi-sec.psk <WIFI-PASSWORD>
+sudo nmcli connection up <CONNECTION-NAME>
+```
 
 ### Install python-libraries on main-raspberry-pi via apt
 
@@ -171,7 +179,9 @@ Edit file `/etc/redis/redis.conf`:
 - Look for line `bind 127.0.0.1 -::1` and replace with `bind 0.0.0.0 ::`
 - Look for line `protected-mode yes` and replace with `protected-mode no`
 
-Restart the redis-service: `sudo systemctl restart redis-server`
+Restart the redis-service: `sudo systemctl restart redis-server.service`
+
+*Note:* There is also a `redis.service` which is a symlink to `redis-server.service`.
 
 Optionally, test the Redis-server from another device in the same LAN:
 
@@ -194,33 +204,27 @@ git clone https://github.com/lzukw/water-reservoir-monitoring.git
 
 ### Data-Collector service on main-raspberry-pi
 
-Check, that the following folders and files exist:
+Check, that the following folders exist:
 
-- `/home/pi/water-reservoir-monitoring`
-- `/home/pi/water-reservoir-monitoring/data`
-- `/home/pi/water-reservoir-monitoring/data/camera-images`
 - `/home/pi/water-reservoir-monitoring/data/camera-images/camera-0`
 - `/home/pi/water-reservoir-monitoring/data/camera-images/camera-1`
-- `/home/pi/water-reservoir-monitoring/data/water-level`
-- `/home/pi/water-reservoir-monitoring/data/water-meter`
-- `/home/pi/water-reservoir-monitoring/data/water-level/sensor-data.csv`
-- `/home/pi/water-reservoir-monitoring/data/water-meter/sensor-data.csv`
-
+- `/home/pi/water-reservoir-monitoring/data/camera-images/camera-2`
+- `/home/pi/water-reservoir-monitoring/data/water-level/`
+- `/home/pi/water-reservoir-monitoring/data/water-meter/`
 
 The data-collector source-code is at `/home/pi/water-reservoir-monitoring/src/data-collector/`.
 
-Create file `/home/pi/water-reservoir-monitoring/water-reservoir-data-collector.service` based on `src/data-collector/water-reservoir-data-collector.service`:
+Create systemd-service-unit-file:
 
 ```sh
-cp /home/pi/water-reservoir-monitoring/src/data-collector/water-reservoir-data-collector.service /home/pi/water-reservoir-monitoring/
+sudo cp ~/water-reservoir-monitoring/src/data-collector/water-reservoir-data-collector.service /etc/systemd/system/
 ```
 
 Check the contents of this file (Paths and command-line-arguments) and adjust if necessary.
 
-Create symlink in `/etc/systemd/system/`, then enable and start service:
+Enable, start and check the service:
 
 ```sh
-sudo ln -s /home/pi/water-reservoir-monitoring/water-reservoir-data-collector.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now water-reservoir-data-collector.service
 # Check for errors:
@@ -241,16 +245,18 @@ The camera source-code is at `/home/pi/water-reservoir-monitoring/src/camera/`.
 
 The camera class is selected automatically in `src/camera/camera/__main__.py`: PiCamera if the picamera library is available, otherwise UsbCamera if a USB camera is present at the `--device` argument, otherwise DummyCamera (a test image with noise, useful for development without a camera).
 
-Create a file `/home/pi/water-reservoir-monitoring/water-reservoir-pi-cam-0.service` on the main-raspberry-pi based on `src/camera/water-reservoir-camera-0.service`:
+*Note:*  On a Raspberry Pi the picamera library is available, and therefore always the PiCamera class is used, even if a USB camera is connected. If you want to use a USB camera instead of the PiCamera, you have to uninstall the picamera library first: `sudo apt remove python3-picamera`. Or remove the import of the picamera library in `src/camera/camera/__main__.py` and replace it with a dummy import, so that the PiCamera class is not available.
+
+Create the systemd-service-unit-file for the camera-process on the main-raspberry-pi:
 
 ```sh
-cp /home/pi/water-reservoir-monitoring/src/camera/water-reservoir-camera-0.service /home/pi/water-reservoir-monitoring/water-reservoir-camera-0.service
+sudo cp ~/water-reservoir-monitoring/src/camera/water-reservoir-camera-0.service /etc/systemd/system/water-reservoir-camera-0.service
 ```
 
-On the cam1-raspberry-pi instead create a file `/home/pi/water-reservoir-monitoring/water-reservoir-camera-1.service` based on `src/camera/water-reservoir-camera-0.service`:
+*Note:* On the cam1-raspberry-pi instead use `/home/pi/water-reservoir-monitoring/water-reservoir-camera-1.service` (one instead of zero).
 
 ```sh
-cp /home/pi/water-reservoir-monitoring/src/camera/water-reservoir-camera-1.service /home/pi/water-reservoir-monitoring/water-reservoir-camera-1.service
+sudo cp ~/water-reservoir-monitoring/src/camera/water-reservoir-camera-1.service /etc/systemd/system/water-reservoir-camera-1.service
 ```
 
 Adjust the service-unit-files, if necessary (e.g. paths, command-line-arguments, etc.).
@@ -259,10 +265,9 @@ Adjust the service-unit-files, if necessary (e.g. paths, command-line-arguments,
 
 - '--rois-to-mark` is not used anymore, because the Water-Meter-Algorithm finds the position of the ROI containing the water-meter-digits automatically.
 
-Create a link in `/etc/systemd/system` and enable and start the service
+Enable, start and check the service:
 
 ```sh
-sudo ln -s /home/pi/water-reservoir-monitoring/water-reservoir-camera-0.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now water-reservoir-camera-0.service
 # Check for errors:
@@ -270,10 +275,9 @@ sudo systemctl status water-reservoir-camera-0.service
 sudo journalctl -f -u water-reservoir-camera-0.service
 ```
 
-On the cam1-raspberry-pi instead use 
+On the cam1-raspberry-pi instead one instead of zero in the service-unit-file:
 
 ```sh
-sudo ln -s /home/pi/water-reservoir-monitoring/water-reservoir-camera-1.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now water-reservoir-camera-1.service
 # Check for errors:
@@ -281,7 +285,7 @@ sudo systemctl status water-reservoir-camera-1.service
 sudo journalctl -f -u water-reservoir-camera-1.service
 ```
 
-Test from other device in the same LAN with redis-cli:
+Optionally, test from other device in the same LAN with redis-cli:
 
 ```sh
 $ redis-cli -h main-raspberry-pi
@@ -301,20 +305,19 @@ On the cam1-raspberry-pi instead use `hget cam:1 timestamp` instead to get the t
 
 ### Water-meter service on main-raspberry-pi
 
-The water-meter source-code is already at `/home/pi/water-reservoir-monitoring/src/water-meter/`
+The water-meter source-code is in `/home/pi/water-reservoir-monitoring/src/water-meter/`
 
-Create the file `/home/pi/water-reservoir-monitoring/water-reservoir-water-meter.service`:
+Create a systemd-service-unit-file for the water-meter-process:
 
 ```sh
-cp /home/pi/water-reservoir-monitoring/src/water-meter/water-reservoir-water-meter.service /home/pi/water-reservoir-monitoring/
+sudo cp /home/pi/water-reservoir-monitoring/src/water-meter/water-reservoir-water-meter.service /etc/systemd/system/
 ```
 
 Adjust the service-unit-file, if necessary (e.g. paths, command-line-arguments, etc.).
 
-Create symlink in `/etc/systemd/system/`, then enable and start service:
+Enable, start and check the service:
 
 ```sh
-sudo ln -s /home/pi/water-reservoir-monitoring/water-reservoir-water-meter.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now water-reservoir-water-meter.service
 # Check for errors:

@@ -30,6 +30,15 @@ DEFAULT_RANSAC_REPROJ_THRESHOLD = 5.0
 
 DIGITS_IMAGE_WIDTH = 800
 
+# Reference images are downscaled on load so that their largest side is at most
+# this many pixels. The camera images are typically 640x480, so a much larger
+# reference image only wastes CPU and memory during SIFT feature extraction
+# (on a memory-limited Raspberry Pi the OOM-killer otherwise kills the process).
+MAX_REFERENCE_IMAGE_DIMENSION = 800
+
+# Maximum number of SIFT features kept per image (strongest ones first).
+DEFAULT_MAX_FEATURES = 2000
+
 WaterMeterValueExtractionState = Literal["open", "error"]
 
 
@@ -51,6 +60,11 @@ class WaterMeterValueExtraction:
         self._redis_key_cam: str = redis_key_cam
         self._redis_key_meter: str = redis_key_meter
 
+        self._logger: logging.Logger = logging.getLogger(
+            f"{__name__}.WaterMeterValueExtraction"
+        )
+        self._logger.setLevel(log_level)
+
         with open(ref_image_json_path, "r") as f:
             ref_image_dict: dict[str, Any] = json.load(f)
 
@@ -61,7 +75,15 @@ class WaterMeterValueExtraction:
         assert rv.ndim == 3 and rv.shape[2] in (3, 4), (
             "Reference image must be a color image."
         )
-        self._ref_img: np.ndarray = rv
+        self._ref_img, ref_scale = self._downscale_image(
+            rv, MAX_REFERENCE_IMAGE_DIMENSION
+        )
+        if ref_scale < 1.0:
+            self._logger.info(
+                f"Downscaled reference-image '{ref_image_path}' by factor {ref_scale:.3f} "
+                f"to {self._ref_img.shape[1]}x{self._ref_img.shape[0]} "
+                f"(max dimension {MAX_REFERENCE_IMAGE_DIMENSION}px)"
+            )
 
         preselect_image_path = ref_image_dict.get("preselect_image_filepath")
         assert preselect_image_path is not None
@@ -70,13 +92,48 @@ class WaterMeterValueExtraction:
         assert rv.ndim == 3 and rv.shape[2] in (3, 4), (
             "Preselect image must be a color image."
         )
-        self._preselect_img: np.ndarray = rv
+        self._preselect_img, preselect_scale = self._downscale_image(
+            rv, MAX_REFERENCE_IMAGE_DIMENSION
+        )
+        if preselect_scale < 1.0:
+            self._logger.info(
+                f"Downscaled preselect-image '{preselect_image_path}' by factor {preselect_scale:.3f} "
+                f"to {self._preselect_img.shape[1]}x{self._preselect_img.shape[0]} "
+                f"(max dimension {MAX_REFERENCE_IMAGE_DIMENSION}px)"
+            )
 
         rv = ref_image_dict.get(JSON_KEY_ROI)
         assert isinstance(rv, list)
         assert len(rv) == 4
         assert all(isinstance(val, int) for val in rv)
-        self._roi: tuple[int, int, int, int] = tuple(rv)
+        # The ROI is given in pixels of the original reference-image; scale it
+        # by the same factor as the downscaled reference-image.
+        x, y, w, h = (max(1, round(val * ref_scale)) for val in rv)
+        self._roi: tuple[int, int, int, int] = (x, y, w, h)
+
+        # SIFT feature extraction is expensive in CPU and memory. The reference
+        # images never change, so their features are extracted only once here
+        # and reused for every camera frame.
+        self._feature_extractor = cv2.SIFT.create(nfeatures=DEFAULT_MAX_FEATURES)
+        self._ref_kp, self._ref_desc = self._detect_features(self._ref_img)
+        assert self._ref_desc is not None and len(self._ref_kp) >= MIN_KEYPOINTS, (
+            f"Not enough keypoints detected in Reference-Image '{ref_image_path}': "
+            f"{len(self._ref_kp) if self._ref_kp else None}"
+        )
+        self._preselect_kp, self._preselect_desc = self._detect_features(
+            self._preselect_img
+        )
+        assert (
+            self._preselect_desc is not None
+            and len(self._preselect_kp) >= MIN_KEYPOINTS
+        ), (
+            f"Not enough keypoints detected in Preselect-Image '{preselect_image_path}': "
+            f"{len(self._preselect_kp) if self._preselect_kp else None}"
+        )
+        self._logger.info(
+            f"Cached SIFT features: {len(self._ref_kp)} keypoints in reference-image, "
+            f"{len(self._preselect_kp)} keypoints in preselect-image"
+        )
 
         # Used to store the ROI extracted from the Redis-Camera-Image
         # as another camera-image to Redis.
@@ -86,9 +143,6 @@ class WaterMeterValueExtraction:
         self._min_accuracy: float = min_accuracy
         self._allowed_change_factor = allowed_change_factor
         self._approx_daily_consumption = approx_daily_consumption
-
-        self._logger: logging.Logger = logging.getLogger(f"{__name__}.DummyCamera")
-        self._logger.setLevel(log_level)
 
         self._last_meter_value: RedisHash = RedisHash(
             datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z"),
@@ -158,14 +212,20 @@ class WaterMeterValueExtraction:
         `Experiments/040_feature-matching_filter-matches-to-same-points.ipynb`"""
         self._logger.debug("Projecting camera-image onto preselect-image")
         preselect_img = self._project_image(
-            camera_img, self._preselect_img, DEFAULT_RANSAC_REPROJ_THRESHOLD
+            camera_img,
+            self._preselect_img,
+            self._preselect_kp,
+            self._preselect_desc,
+            DEFAULT_RANSAC_REPROJ_THRESHOLD,
         )
         if preselect_img is None:
             return None
         self._logger.debug(
             "Projecting preselect-image onto reference-image (meter-dial-image)"
         )
-        meter_dial_img = self._project_image(preselect_img, self._ref_img, 3.0)
+        meter_dial_img = self._project_image(
+            preselect_img, self._ref_img, self._ref_kp, self._ref_desc, 3.0
+        )
         if meter_dial_img is None:
             return None
 
@@ -255,14 +315,39 @@ class WaterMeterValueExtraction:
         self._last_meter_value = new_water_meter_value
         self._store_meter_value_to_redis(new_water_meter_value)
 
+    @staticmethod
+    def _downscale_image(
+        img: np.ndarray, max_dimension: int
+    ) -> tuple[np.ndarray, float]:
+        """Downscale img so that its largest side is at most max_dimension pixels.
+        Returns the (possibly unchanged) image and the applied scale factor."""
+        height, width = img.shape[:2]
+        scale = min(1.0, max_dimension / max(height, width))
+        if scale < 1.0:
+            new_size = (max(1, round(width * scale)), max(1, round(height * scale)))
+            img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
+        return img, scale
+
+    def _detect_features(
+        self, img: np.ndarray
+    ) -> tuple[Sequence[cv2.KeyPoint], np.ndarray | None]:
+        """Detect SIFT keypoints and descriptors in img. If the image has an
+        alpha channel, it is used as a mask restricting the keypoint centers
+        (not the surrounding descriptor region)."""
+        mask = img[:, :, 3] if img.ndim == 3 and img.shape[2] == 4 else None
+        return self._feature_extractor.detectAndCompute(img, mask=mask)
+
     def _project_image(
         self,
         cur_img: np.ndarray,
         ref_img: np.ndarray,
+        ref_kp: Sequence[cv2.KeyPoint],
+        ref_desc: np.ndarray,
         ransac_reproj_threshold: float = DEFAULT_RANSAC_REPROJ_THRESHOLD,
     ) -> np.ndarray | None:
-        """Compute the homography between two images. Returns the homography matrix and matching
-        reference and current points that were used to compute the homography.
+        """Compute the homography between the current image and a reference image
+        whose SIFT features (ref_kp, ref_desc) were precomputed (cached at startup),
+        warp the current image into the reference image's frame and return it.
         If the homography cannot be computed, returns None."""
         assert cur_img.ndim == 3 and cur_img.shape[2] in (3, 4), (
             "Current image must be a color image."
@@ -271,20 +356,9 @@ class WaterMeterValueExtraction:
             "Reference image must be a color image."
         )
 
-        # The mask restricts keypoint centers, not the surrounding descriptor region.
-        feature_search_mask = ref_img[:, :, 3] if ref_img.shape[2] == 4 else None
-
-        # Find features (keypoints and their descriptors) in both images
-        feature_extractor = cv2.SIFT.create()
-        ref_kp, ref_desc = feature_extractor.detectAndCompute(
-            ref_img, mask=feature_search_mask
-        )
-        cur_kp, cur_desc = feature_extractor.detectAndCompute(cur_img, None)
-        if ref_desc is None or len(ref_kp) < MIN_KEYPOINTS:
-            self._logger.debug(
-                f"Not enough keypoints detected in Reference-Image: {len(ref_kp) if ref_kp else None}"
-            )
-            return None
+        # Find features (keypoints and their descriptors) in the current image;
+        # the reference features are passed in (cached at startup).
+        cur_kp, cur_desc = self._detect_features(cur_img)
         if cur_desc is None or len(cur_kp) < MIN_KEYPOINTS:
             self._logger.debug(
                 f"Not enough keypoints detected in Current Camera Image: {len(cur_kp) if cur_kp else None}"

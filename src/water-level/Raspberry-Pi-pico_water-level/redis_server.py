@@ -105,7 +105,7 @@ if __name__ == "__main__":
     redis_server = RedisServer(config=config, log_level="DEBUG")
 
     async def main():
-        asyncio.create_task(wifi.connect_forever_as_station_with_fallback_as_ap())
+        asyncio.create_task(wifi.connect_ap_and_sta_forever())
         asyncio.create_task(network_time.get_network_time_forever())
         asyncio.create_task(redis_server.connect_forever())
 

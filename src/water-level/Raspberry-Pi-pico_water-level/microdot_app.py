@@ -63,7 +63,7 @@ class MicrodotApp:
         # global sensor_distance_in_m ...only accessing global variable, not modifying it
         hostname = self._config.hostname
         if hostname == "":
-            hostname = "water-level-" + self._wifi.get_mac_address(separator="")
+            hostname = "water-level-" + self._wifi.get_ap_mac_address(separator="")
 
         return Template("config.html").render(
             hostname=escape_html(hostname),
@@ -203,7 +203,7 @@ if __name__ == "__main__":
                                ultrasonic_sensor=ultrasonic_sensor)
 
     async def main():
-        asyncio.create_task(wifi.connect_forever_as_station_with_fallback_as_ap())
+        asyncio.create_task(wifi.connect_ap_and_sta_forever())
         asyncio.create_task(network_time.get_network_time_forever())
         asyncio.create_task(redis_server.connect_forever())
         asyncio.create_task(ultrasonic_sensor.measure_and_publish_distance_forever())

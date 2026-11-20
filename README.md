@@ -421,4 +421,4 @@ The Raspberry Pi Pico can be configured using Wifi and a Webbrowser. See [README
 
 Follow the Instruction for the Main-Raspberry-Pi, but use hostname `cam1-raspberry-pi`. The camera is observing the water coming from the springs.
 
-Only setup `water-reservoir-camera-1.service` on this Raspberry Pi. The other services (`water-reservoir-data-collector.service`, `water-reservoir-water-meter.service`, `water-reservoir-flask-website.service`) are only needed on the Main-Raspberry-Pi.
+Only setup `water-reservoir-camera-1.service` on this Raspberry Pi. The other services (`water-reservoir-data-collector.service`, `water-reservoir-water-meter.service`, `water-reservoir-flask-website.service`) are only needed on the Main-Raspberry-Pi. There is also no need to install all python-libriaries (like python3-flask) on this Raspberry Pi. But there is also no harm in installing them.

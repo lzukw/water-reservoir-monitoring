@@ -347,20 +347,19 @@ $
 
 The flask-website source-code is at `/home/pi/water-reservoir-monitoring/src/flask-website/`.
 
-Create the file `/home/pi/water-reservoir-monitoring/water-reservoir-flask-website.service`:
+Create a systemd-service-unit-file for the flask-website-process:
 
 ```sh
-cp /home/pi/water-reservoir-monitoring/src/flask-website/water-reservoir-flask-website.service /home/pi/water-reservoir-monitoring/
+sudo cp /home/pi/water-reservoir-monitoring/src/flask-website/water-reservoir-flask-website.service /etc/systemd/system/
 ```
 
-**Note:** The flask-server is listening on Port 5000 on all interfaces. This is secure in the local LAN, because the Router (Fritzbox) is configured to not forward Port 5000 to the internet. If later a reverse-proxy is configured, the comman-line-argument in `water-reservoir-flask-website.service` can be changed to: `--flask-host=127.0.0.1`
+**Note:** The flask-server is listening on Port 5000 on all interfaces. This is secure in the local LAN, because the Router (Fritzbox) is configured to not forward Port 5000 to the internet. If later a reverse-proxy is configured, the command-line-argument in `water-reservoir-flask-website.service` can be changed to: `--flask-host=127.0.0.1`
 
 Adjust the service-unit-file, if necessary (e.g. paths, command-line-arguments, etc.).
 
-Create symlink in `/etc/systemd/system/`, then enable and start service:
+Enable, start and check the service:
 
 ```sh
-sudo ln -s /home/pi/water-reservoir-monitoring/water-reservoir-flask-website.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now water-reservoir-flask-website.service
 # Check for errors:
@@ -420,6 +419,6 @@ The Raspberry Pi Pico can be configured using Wifi and a Webbrowser. See [README
 
 ## Raspberry Pi for Camera 1
 
-Follow the Instruction for the Main-Raspberry-Pi, but use hostname `cam1-raspberry-pi`. The camera is observing the water-reservoir and the water coming from the springs.
+Follow the Instruction for the Main-Raspberry-Pi, but use hostname `cam1-raspberry-pi`. The camera is observing the water coming from the springs.
 
 Only setup `water-reservoir-camera-1.service` on this Raspberry Pi. The other services (`water-reservoir-data-collector.service`, `water-reservoir-water-meter.service`, `water-reservoir-flask-website.service`) are only needed on the Main-Raspberry-Pi.

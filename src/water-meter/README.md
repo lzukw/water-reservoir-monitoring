@@ -18,7 +18,7 @@ cd path/to/water-reservoir-monitoring/src/water-meter
 python3 -m water_meter --redis-server=main-raspberry-pi --log-level=INFO
 ```
 
-The current working directory must be `src/water-meter/`, because the reference-image JSON (`--reference-image-jsonfile`, default `./water_meter/reference_images.json`) and the reference-image path inside it (`./water_meter/water-meter-reference-image.jpg`) are relative to it.
+The current working directory must be `src/water-meter/`, because the reference-image JSON (`--reference-image-jsonfile`, default `./water_meter/reference_images.json`) and the reference-image path inside it (`./water_meter/water-meter-dial-image.jpg`) are relative to it.
 
 All options can be listed with `python3 -m water_meter --help`.
 
@@ -56,13 +56,32 @@ Each key is a Redis hash with two fields (`timestamp`, `value` by default):
 
 ```json
 {
-    "reference_image_filepath" : "./water_meter/water-meter-reference-image.jpg",
-    "roi" : [155, 194, 444, 85]
+    "preselect_image_filepath" : "./water_meter/preselect-image.jpg",
+    "reference_image_filepath" : "./water_meter/water-meter-dial-image.jpg",
+    "roi" : [120, 159, 471, 131]
 }
 ```
 
+- `preselect_image_filepath`: path to the preselect image (relative to the working directory). This image is used to preselect the region of interest before feature matching.
 - `reference_image_filepath`: path to the reference image (relative to the working directory). If the image has an alpha channel (4 channels, e.g. PNG), the alpha channel is thresholded and used as feature-search mask.
 - `roi`: `[x, y, width, height]` of the digits region in the reference image.
+
+### Note on preselect and reference images
+
+These images should be taken with a good camera (mobile phone). The preselect images shows the whole water-meter with the surrounding scres, which are good features for the SIFT feature-matching. The reference image shows only the dial with the digits, which is the region of interest (ROI) to be extracted from the camera images.
+
+Both images were extracted from a single image, taken with a mobile phone camrea, under good lightnig conditions from the side (The LED strips for lighting were in the same position as in the final arrangement). No shadows or reflections must be present in the final lighting conditions in the dial-region.
+
+The image was then processed with GIMP to extract the two reference-images.
+
+Not stable regions in both images are masked out (digits region, since the digits change over time and the needles). To prevent SIFT from finding cornsers (as keypoints) on the borders of the masked out regions, the masked out regions are dilated by a few pixels: in GIMP a value of 30 was used when blurring borders of the rectangle- and lasso-selection. 
+
+Both images were then resized to a width of **800 pixels**, because SIFT uses too much memory otherwise (On first tests with the original images, the water_meter-process died with a linux-kernel-OOM / Out of Memory error).
+
+The ROI with the digits (top left corner x, y, width, height) was measured in GIMP with the rectangle selection tool and is stored in the reference-images JSON. The ROI is used to cut out the digits from the warped camera image.
+
+This ROI is a bit bigger than the digits: On a first intent only the box containing the digits was used, but this was not stable enough: Sometimes the digits were not fully contained in the ROI, so the extracted digits-image was incomplete and the OCR failed. The ROI was then enlarged on all sides, so that the digits are always fully contained in the ROI.
+
 
 ## systemd service
 

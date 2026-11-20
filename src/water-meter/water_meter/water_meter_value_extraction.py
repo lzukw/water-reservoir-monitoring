@@ -20,6 +20,7 @@ DEFAULT_APPROX_DAILY_CONSUMPTION = 200.0
 DEFAULT_MIN_ACCURACY = 0.9
 DEFAULT_METER_WRAP_AROUND = 10000000.0
 
+JSON_KEY_PRESELECT_IMAGE_FILEPATH = "preselect_image_filepath"
 JSON_KEY_REF_IMAGE_FILEPATH = "reference_image_filepath"
 JSON_KEY_ROI = "roi"
 
@@ -75,61 +76,50 @@ class WaterMeterValueExtraction:
         assert rv.ndim == 3 and rv.shape[2] in (3, 4), (
             "Reference image must be a color image."
         )
-        self._ref_img, ref_scale = self._downscale_image(
-            rv, MAX_REFERENCE_IMAGE_DIMENSION
-        )
-        if ref_scale < 1.0:
-            self._logger.info(
-                f"Downscaled reference-image '{ref_image_path}' by factor {ref_scale:.3f} "
-                f"to {self._ref_img.shape[1]}x{self._ref_img.shape[0]} "
-                f"(max dimension {MAX_REFERENCE_IMAGE_DIMENSION}px)"
-            )
+        self._ref_img = rv
 
-        preselect_image_path = ref_image_dict.get("preselect_image_filepath")
+        preselect_image_path = ref_image_dict.get(JSON_KEY_PRESELECT_IMAGE_FILEPATH)
         assert preselect_image_path is not None
         rv = cv2.imread(preselect_image_path, cv2.IMREAD_UNCHANGED)
         assert rv is not None, f"Cannot open Preselect-Image '{preselect_image_path}'"
         assert rv.ndim == 3 and rv.shape[2] in (3, 4), (
             "Preselect image must be a color image."
         )
-        self._preselect_img, preselect_scale = self._downscale_image(
-            rv, MAX_REFERENCE_IMAGE_DIMENSION
-        )
-        if preselect_scale < 1.0:
-            self._logger.info(
-                f"Downscaled preselect-image '{preselect_image_path}' by factor {preselect_scale:.3f} "
-                f"to {self._preselect_img.shape[1]}x{self._preselect_img.shape[0]} "
-                f"(max dimension {MAX_REFERENCE_IMAGE_DIMENSION}px)"
-            )
+        self._preselect_img = rv
 
         rv = ref_image_dict.get(JSON_KEY_ROI)
         assert isinstance(rv, list)
         assert len(rv) == 4
         assert all(isinstance(val, int) for val in rv)
-        # The ROI is given in pixels of the original reference-image; scale it
-        # by the same factor as the downscaled reference-image.
-        x, y, w, h = (max(1, round(val * ref_scale)) for val in rv)
-        self._roi: tuple[int, int, int, int] = (x, y, w, h)
+        self._roi: tuple[int, int, int, int] = tuple(rv)
 
         # SIFT feature extraction is expensive in CPU and memory. The reference
         # images never change, so their features are extracted only once here
         # and reused for every camera frame.
         self._feature_extractor = cv2.SIFT.create(nfeatures=DEFAULT_MAX_FEATURES)
-        self._ref_kp, self._ref_desc = self._detect_features(self._ref_img)
-        assert self._ref_desc is not None and len(self._ref_kp) >= MIN_KEYPOINTS, (
-            f"Not enough keypoints detected in Reference-Image '{ref_image_path}': "
-            f"{len(self._ref_kp) if self._ref_kp else None}"
-        )
-        self._preselect_kp, self._preselect_desc = self._detect_features(
-            self._preselect_img
-        )
+
+        ref_kp, ref_desc = self._detect_features(self._ref_img)
         assert (
-            self._preselect_desc is not None
-            and len(self._preselect_kp) >= MIN_KEYPOINTS
+            ref_desc is not None and ref_kp is not None and len(ref_kp) >= MIN_KEYPOINTS
+        ), (
+            f"Not enough keypoints detected in Reference-Image '{ref_image_path}': "
+            f"{len(ref_kp) if ref_kp else None}"
+        )
+        self._ref_kp: Sequence[cv2.KeyPoint] = ref_kp
+        self._ref_desc: np.ndarray = ref_desc
+
+        preselect_kp, preselect_desc = self._detect_features(self._preselect_img)
+        assert (
+            preselect_desc is not None
+            and preselect_kp is not None
+            and len(preselect_kp) >= MIN_KEYPOINTS
         ), (
             f"Not enough keypoints detected in Preselect-Image '{preselect_image_path}': "
-            f"{len(self._preselect_kp) if self._preselect_kp else None}"
+            f"{len(preselect_kp) if preselect_kp else None}"
         )
+        self._preselect_kp: Sequence[cv2.KeyPoint] = preselect_kp
+        self._preselect_desc: np.ndarray = preselect_desc
+
         self._logger.info(
             f"Cached SIFT features: {len(self._ref_kp)} keypoints in reference-image, "
             f"{len(self._preselect_kp)} keypoints in preselect-image"
@@ -278,7 +268,7 @@ class WaterMeterValueExtraction:
         # Extract ROI with digits from the image
         digits_image = self._extract_roi_from_frame(camera_image)
         if digits_image is None:
-            self._logger.debug(f"Could not extract digits-ROI from camera-image")
+            self._logger.debug("Could not extract digits-ROI from camera-image")
             return
 
         # Store the digits-image as new "Camera"-Image, if desired.
@@ -314,19 +304,6 @@ class WaterMeterValueExtraction:
         new_water_meter_value = RedisHash(frame_timestamp, extracted_value)
         self._last_meter_value = new_water_meter_value
         self._store_meter_value_to_redis(new_water_meter_value)
-
-    @staticmethod
-    def _downscale_image(
-        img: np.ndarray, max_dimension: int
-    ) -> tuple[np.ndarray, float]:
-        """Downscale img so that its largest side is at most max_dimension pixels.
-        Returns the (possibly unchanged) image and the applied scale factor."""
-        height, width = img.shape[:2]
-        scale = min(1.0, max_dimension / max(height, width))
-        if scale < 1.0:
-            new_size = (max(1, round(width * scale)), max(1, round(height * scale)))
-            img = cv2.resize(img, new_size, interpolation=cv2.INTER_AREA)
-        return img, scale
 
     def _detect_features(
         self, img: np.ndarray

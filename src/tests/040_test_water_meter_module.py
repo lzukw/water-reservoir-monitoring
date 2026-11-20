@@ -8,6 +8,9 @@ Steps:
    image is stored roughly every --period seconds, so the module sees new frames.
 3. Start the water_meter module (python -m water_meter) as a subprocess with
    --period (default 1s, to speed up the test) and the other redis/camera arguments.
+   The water_meter-module reads the noisy test-image from Redis (key 'cam:0'),
+   extracts the digits-ROI and the meter-value, and stores them in Redis
+   (keys 'cam:2' and 'water-meter').
 4. For about --duration seconds (default 10s), read the extracted digits-images from
    Redis (key 'cam:2'), display them in an OpenCV window (if a GUI is available) and
    check their timestamps. Also read the extracted meter-values (key 'water-meter').
@@ -45,6 +48,11 @@ START_REDIS_SCRIPT = TESTS_DIR / "010_start_test-redis-server.sh"
 JPEG_MAGIC = b"\xff\xd8\xff"
 HASHKEY_TIMESTAMP = b"timestamp"
 HASHKEY_VALUE = b"value"
+
+# Change directry to the directory, where water_meter is located The water_meter-
+# module is always started from here, and paths in the json-file are relative to
+# this directory.
+# os.chdir(WATER_METER_DIR)
 
 
 def parse_args() -> argparse.Namespace:
@@ -156,14 +164,6 @@ def stop_process_group(
         proc.wait(timeout=timeout)
 
 
-def iso_now_z() -> str:
-    return datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def parse_timestamp(ts: str) -> datetime:
-    return datetime.fromisoformat(ts.replace("Z", "+00:00"))
-
-
 def store_noisy_cam_image(
     client: redis.Redis, img: np.ndarray, rng: np.random.Generator, noise: int
 ) -> str:
@@ -176,7 +176,7 @@ def store_noisy_cam_image(
     ).astype(np.uint8)
     ok, encoded = cv2.imencode(".jpg", noisy, [cv2.IMWRITE_JPEG_QUALITY, 95])
     assert ok
-    ts = iso_now_z()
+    ts = datetime.now(UTC).isoformat(timespec="milliseconds").replace("+00:00", "Z")
     client.hset(
         KEY_CAM_IN, mapping={HASHKEY_TIMESTAMP: ts, HASHKEY_VALUE: encoded.tobytes()}
     )
@@ -302,7 +302,7 @@ def main() -> int:
                         ts = ts_b.decode("utf-8", errors="replace")
                         if ts != last_roi_ts:
                             last_roi_ts = ts
-                            roi_observations.append((parse_timestamp(ts), val_b))
+                            roi_observations.append((datetime.fromisoformat(ts), val_b))
                             is_jpeg = (
                                 val_b.startswith(JPEG_MAGIC)
                                 and cv2.imdecode(
@@ -342,7 +342,7 @@ def main() -> int:
                         if ts != last_meter_ts:
                             last_meter_ts = ts
                             value = float(val_b.decode("utf-8", errors="replace"))
-                            meter_values.append((parse_timestamp(ts), value))
+                            meter_values.append((datetime.fromisoformat(ts), value))
                             logger.info(
                                 f"Extracted meter-value in '{KEY_METER}' at {ts}: {value} (expected: {ARGS.expected_value}, diff: {value - ARGS.expected_value:+.6f})"
                             )

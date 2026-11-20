@@ -1,5 +1,5 @@
 {
     "preselect_image_filepath" : "./water_meter/preselect-image.jpg",
     "reference_image_filepath" : "./water_meter/water-meter-dial-image.jpg",
-    "roi" : [120, 171, 499, 125]
+    "roi" : [120, 159, 471, 131]
 }

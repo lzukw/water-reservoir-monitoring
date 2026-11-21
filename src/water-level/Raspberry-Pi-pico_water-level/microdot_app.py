@@ -148,12 +148,11 @@ class MicrodotApp:
         async def status(request):
             self._logger.log("INFO", f"GET-Request to /status from {request.client_addr}")
 
-            ultrasonic_distance: str
-            distance = self._ultrasonic_sensor.measure_distance()
-            if distance is None:
-                ultrasonic_distance = "Got invalid value from sensor"
-            else:
-                ultrasonic_distance = f"{distance:.2f} m"
+            # Use the last value measured by the sensor loop instead of triggering a
+            # new measurement here: measure_distance() blocks up to echo_timeout_us
+            # (50 ms), which would stall the whole event loop on every /status poll.
+            distance = self._ultrasonic_sensor.last_distance
+            ultrasonic_distance = f"{distance:.2f} m" if distance is not None else "Got invalid value from sensor"
 
             distance_to_bottom = self._config.distance_to_bottom
             water_level = f"{distance_to_bottom - distance:.2f} m" if distance is not None and distance_to_bottom is not None else "Unknown"
@@ -164,7 +163,7 @@ class MicrodotApp:
                 "network_time": self._network_time.get_current_time_UTC_iso(),
                 "redis_server_status": self._redis_server.status,
                 "ultrasonic_distance": ultrasonic_distance,
-                "distance_to_bottom": f"{distance_to_bottom:.2f} m",
+                "distance_to_bottom": f"{distance_to_bottom:.2f} m" if distance_to_bottom is not None else "Unknown",
                 "water_level": water_level
             }, 200, {"Content-Type": "application/json; charset=UTF-8"}
 

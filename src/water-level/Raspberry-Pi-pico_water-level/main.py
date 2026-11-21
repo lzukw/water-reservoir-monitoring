@@ -46,7 +46,7 @@ microdot_app = MicrodotApp(config=config,
 async def main():
     # Start wifi-connection-loop as background task.
     logger.log("INFO", "Starting Wifi connection...")
-    asyncio.create_task(wifi.connect_ap_or_sta_forever())
+    wifi_task = asyncio.create_task(wifi.connect_ap_or_sta_forever())
     # wait for wifi to connect (without wifi-connection, there is no use to continue anything further)
     while not wifi.status.startswith("connected as"):
         await asyncio.sleep(1)
@@ -58,7 +58,7 @@ async def main():
 
     # start network time synchronization as background task
     logger.log("INFO", "Starting network time synchronization...")
-    asyncio.create_task(network_time.get_network_time_forever())
+    network_time_task = asyncio.create_task(network_time.get_network_time_forever())
     starttime = utime.ticks_ms()
     # wait 10 seconds for network time to be valid, if it doesn't, continue anyway
     while utime.ticks_diff(utime.ticks_ms(), starttime) < 10000:
@@ -68,7 +68,7 @@ async def main():
 
     # start redis-connection-loop as background task
     logger.log("INFO", "Starting Redis connection...")
-    asyncio.create_task(redis_server.connect_forever())
+    redis_task = asyncio.create_task(redis_server.connect_forever())
     starttime = utime.ticks_ms()
     # wait 10 seconds for redis to connect, if it doesn't, continue anyway
     while utime.ticks_diff(utime.ticks_ms(), starttime) < 10000:
@@ -78,10 +78,39 @@ async def main():
 
     # start ultrasonic sensor measurement as background task
     logger.log("INFO", "Starting ultrasonic sensor measurement...")
-    asyncio.create_task(ultrasonic_sensor.measure_and_publish_distance_forever())
+    sensor_task = asyncio.create_task(ultrasonic_sensor.measure_and_publish_distance_forever())
 
-    await server_task
-    logger.log("INFO", "Web server stopped. Will reset the device now.")
+    # Watchdog: keep references to all tasks and check them periodically.
+    # - The web server task ending is the *intended* shutdown path (e.g. after
+    #   "Save and Apply" in the config web page): reset to apply the new config.
+    # - Any other task ending is unexpected, because the *_forever loops should
+    #   never return. If one dies (unhandled exception), log it and reset the
+    #   device, so it recovers into a clean, fully working state.
+    background_tasks = {
+        "wifi": wifi_task,
+        "network_time": network_time_task,
+        "redis": redis_task,
+        "sensor": sensor_task,
+    }
+    while True:
+        if server_task.done():
+            logger.log("INFO", "Web server stopped. Will reset the device now.")
+            break
+        dead_tasks = [name for name, task in background_tasks.items() if task.done()]
+        if dead_tasks:
+            for name in dead_tasks:
+                logger.log("ERROR", f"Watchdog: background task '{name}' ended unexpectedly.")
+                try:
+                    exc = background_tasks[name].exception()
+                    if exc is not None:
+                        logger.log("ERROR", f"Task '{name}' raised: {exc!r}")
+                except Exception:
+                    pass  # Task.exception() may not exist on older MicroPython versions
+            logger.log("ERROR", "Watchdog: resetting device to recover.")
+            break
+        await asyncio.sleep(5)  # watchdog check interval: 5 seconds
+
+    logger.log("INFO", "Resetting device...")
     machine.reset()
 
 asyncio.run(main())

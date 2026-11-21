@@ -36,8 +36,17 @@ class UltrasonicSensor:
         self._config = config
         self._redis_server = redis_server
         self._network_time = network_time
-        
+
+        self._last_distance : float | None = None  # most recent measurement (m), None if none/invalid
+
         self._logger = Logger(name="UltrasonicSensor", log_level=log_level)
+
+    @property
+    def last_distance(self) -> float | None:
+        """The most recently measured distance in meters, as updated by the sensor
+        loop. Returns None if no valid measurement has been made yet. Reading this
+        is non-blocking, unlike measure_distance()."""
+        return self._last_distance
 
     def measure_distance(self) -> float | None:
         """Measures the distance using the ultrasonic sensor.
@@ -66,10 +75,21 @@ class UltrasonicSensor:
     def measure_and_publish_distance(self):
         """Measures the distance and publishes it to the Redis server."""
         distance = self.measure_distance()
-        
+        self._last_distance = distance  # cache for non-blocking readers (e.g. the /status web route)
+
         if distance is None:
             self._logger.log("INFO", "No distance measured. Skipping publishing to Redis server.")
             return
+
+        distance_to_bottom = self._config.distance_to_bottom
+        if distance_to_bottom is None:
+            self._logger.log("ERROR", "Distance to bottom is not set in config. Skipping publishing distance to Redis server.")
+            return
+
+        water_level = distance_to_bottom - distance
+
+        self._logger.log("INFO", f"Measured distance {distance:.2f} m, distance to bottom: {distance_to_bottom:.2f} m, water level: {water_level:.2f} m")
+
         if self._network_time.time_status == "not valid":
             self._logger.log("INFO", "Network time is not valid. Skipping publishing distance to Redis server.")
             return
@@ -83,25 +103,26 @@ class UltrasonicSensor:
             self._logger.log("ERROR", "Redis key or hash keys are not set. Skipping publishing distance to Redis server.")
             return
 
-        distance_to_botton = self._config.distance_to_bottom
-        if distance_to_botton is None:
-            self._logger.log("ERROR", "Distance to bottom is not set in config. Skipping publishing distance to Redis server.")
-            return
-        
         timestamp = self._network_time.get_current_time_UTC_iso()
         success = self._redis_server.hset(redis_key, {
             redis_hashkey_timestamp: timestamp,
-            redis_hashkey_value: f"{distance_to_botton - distance:.2f}"
+            redis_hashkey_value: f"{water_level:.2f}"
             })
         if success:
-            self._logger.log("DEBUG", f"Published distance {distance:.2f} m to Redis server with timestamp {timestamp}.")
+            self._logger.log("INFO", f"Published distance {distance:.2f} m to Redis server with timestamp {timestamp}.")
         else:
             self._logger.log("ERROR", "Failed to publish distance to Redis server.")    
 
     async def measure_and_publish_distance_forever(self):
-        """Continuously measures the distance and publishes it to the Redis server."""
+        """Continuously measures the distance and publishes it to the Redis server.
+        Exceptions in a single iteration are caught and logged, so this loop
+        survives transient errors (e.g. a sensor or Redis hiccup) and keeps
+        running instead of dying silently."""
         while True:
-            self.measure_and_publish_distance()
+            try:
+                self.measure_and_publish_distance()
+            except Exception as e:
+                self._logger.log("ERROR", f"Unexpected error in sensor loop, will retry in {self._sensor_loop_period} s: {e}")
             await asyncio.sleep(self._sensor_loop_period)
 
 if __name__ == "__main__":

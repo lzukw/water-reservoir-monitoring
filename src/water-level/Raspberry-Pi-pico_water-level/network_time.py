@@ -87,7 +87,7 @@ if __name__ == "__main__":
     network_time = NetworkTime(wifi=wifi, log_level="DEBUG", period=10)
 
     async def main():
-        asyncio.create_task(wifi.connect_ap_and_sta_forever())
+        asyncio.create_task(wifi.connect_ap_or_sta_forever())
         asyncio.create_task(network_time.get_network_time_forever())
         while True:
             await asyncio.sleep(1)

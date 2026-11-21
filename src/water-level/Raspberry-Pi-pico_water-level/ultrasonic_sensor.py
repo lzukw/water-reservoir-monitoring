@@ -130,7 +130,7 @@ if __name__ == "__main__":
                                          log_level="DEBUG")
 
     async def main():
-        asyncio.create_task(wifi.connect_ap_and_sta_forever())
+        asyncio.create_task(wifi.connect_ap_or_sta_forever())
         asyncio.create_task(network_time.get_network_time_forever())
         asyncio.create_task(redis_server.connect_forever())
         asyncio.create_task(ultrasonic_sensor.measure_and_publish_distance_forever())

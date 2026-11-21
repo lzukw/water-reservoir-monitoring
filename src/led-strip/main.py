@@ -35,7 +35,7 @@ microdot_app = MicrodotApp(config=config,
 
 async def main():
     logger.log("INFO", "Starting Wifi connection...")
-    asyncio.create_task(wifi.connect_forever_as_station_with_fallback_as_ap())
+    asyncio.create_task(wifi.connect_ap_and_sta_forever())
     starttime = utime.ticks_ms()
     while utime.ticks_diff(utime.ticks_ms(), starttime) < 10000:
         if wifi.status.startswith("connected as"):

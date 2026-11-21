@@ -36,13 +36,12 @@ class Wifi:
 
     @property
     def status_ap(self) -> str:
-        """Status of the Access-Point interface. Returns "not connected", "connecting"
+        """Status of the Access-Point interface. Returns "not connected", "connecting",
         or "connected as AP". If the Access Point was lost, the status is reset to
         "not connected"."""
-        if self._status_ap == "connected as AP":
-            if not self._wlan_ap.active():
-                self._logger.log("INFO", "Lost Wifi Access Point")
-                self._status_ap = "not connected"
+        if self._status_ap == "connected as AP" and not self._wlan_ap.active():
+            self._logger.log("INFO", "Lost Wifi Access Point")
+            self.disconnect_ap()
         return self._status_ap
 
     @property
@@ -50,11 +49,13 @@ class Wifi:
         """Status of the Station (client) interface. Returns "not connected", "connecting"
         or "connected as client". If the connection to the router was lost, the status is
         reset to "not connected"."""
-        if self._status_sta == "connected as client":
-            if not self._wlan_sta.isconnected() or self._wlan_sta.status() != network.STAT_GOT_IP:
+        if ( 
+            self._status_sta == "connected as client" 
+            and ( not self._wlan_sta.isconnected() 
+                 or self._wlan_sta.status() != network.STAT_GOT_IP )
+        ):
                 self._logger.log("INFO", "Lost connection to Wifi as Client")
-                self._wlan_sta.disconnect()
-                self._status_sta = "not connected"
+                self.disconnect_sta()
         return self._status_sta
 
     @property
@@ -110,15 +111,31 @@ class Wifi:
         mac_str = separator.join(f'{b:02X}' for b in mac_bytes)
         return mac_str
 
+    def disconnect_ap(self):
+        """Disconnect Access-Point-Interface"""
+        self._wlan_ap.disconnect()
+        # Don't use asyncio.sleep() here, because this funciton should not be async. 
+        # Making it async would imply another "Disconnecting" state, and also the status-
+        # properties would have to be async, which is not possible. So we just use time.sleep() here.
+        time.sleep(1)
+        self._wlan_ap.active(False)
+        self._status_ap = "not connected"
+        gc.collect()
+
+    def disconnect_sta(self):
+        """Disconnect Station-Interface"""
+        self._wlan_sta.disconnect()
+        # Again: Don't use asyncio.sleep() here, because this function should not be async.
+        time.sleep(1)
+        self._wlan_sta.active(False)
+        self._status_sta = "not connected"
+        gc.collect()
+
     def disconnect(self):
         """Disconnect both interfaces: the station disconnects from the router and
         the Access Point is turned off."""
-        self._wlan_sta.disconnect()
-        self._wlan_sta.active(False)
-        self._wlan_ap.active(False)
-        self._status_sta = "not connected"
-        self._status_ap = "not connected"
-        gc.collect()
+        self.disconnect_ap()
+        self.disconnect_sta()
 
     async def connect_as_ap(self) -> bool:
         """Start the Access-Point interface. The station interface is not touched, so
@@ -137,14 +154,12 @@ class Wifi:
         self._status_ap = "connected as AP"
         # self.status_ap property will check if the AP is really active and
         # only return "connected as AP" if AP-mode is working.
-        if not self.status_ap == "connected as AP":
+        if self.status_ap != "connected as AP":
             self._logger.log("ERROR", "Failed to put Wifi in Access Point mode.")
-            self._wlan_ap.active(False)
-            self._status_ap = "not connected"
+            self.disconnect_ap()
             return False
         self._logger.log("INFO", f"Successfully started Wifi Access Point. SSID='{ap_ssid}', password='{self._ap_password}'")
-        ip_address, netmask, ip_gateway, ip_dns_server = self._wlan_ap.ifconfig()
-        self._logger.log("INFO", f"AP IP-Address {ip_address}, netmask {netmask}, Gateway: {ip_gateway}, DNS: {ip_dns_server}")
+        self._logger.log("INFO", f"AP IP-Address {self.ip_address}, netmask {self.netmask}, Gateway: {self.ip_gateway}, DNS: {self.ip_dns_server}")
         return True
 
     async def connect_as_client(self) -> bool:
@@ -167,27 +182,24 @@ class Wifi:
         while not self._wlan_sta.isconnected():
             if time.ticks_diff(end_time, time.ticks_ms()) < 0:
                 self._logger.log("INFO", "Failed to connect to Wi-Fi as client.")
-                self._wlan_sta.disconnect()
-                self._status_sta = "not connected"
+                self.disconnect_sta()
                 return False
             self._logger.log("DEBUG", f"...Current WLAN-Status {self._wlan_sta.status()}")
             await asyncio.sleep(1) 
         self._status_sta = "connected as client"
         # self.status_sta property will check if we are really connected and got an IP
         # and only return "connected as client" if station-mode is working.
-        if not self.status_sta == "connected as client":
-            self._logger.log("ERROR", "Connected to Wi-Fi as client, but got no IP.")
-            self._wlan_sta.disconnect()
-            self._status_sta = "not connected"
+        if self.status_sta != "connected as client":
+            self._logger.log("ERROR", "Failed to connect to Wi-Fi as client.")
+            self.disconnect_sta()
             return False
         self._logger.log("INFO", "Successfully connected to Wifi as Client.")
-        ip_address, netmask, ip_gateway, ip_dns_server = self._wlan_sta.ifconfig()
-        self._logger.log("INFO", f"IP-Address {ip_address}, netmask {netmask}, Gateway: {ip_gateway}, DNS: {ip_dns_server}")
+        self._logger.log("INFO", f"IP-Address {self.ip_address}, netmask {self.netmask}, Gateway: {self.ip_gateway}, DNS: {self.ip_dns_server}")
         # In station-mode, we assume that our Gateway is also a Timeserver
-        self._logger.log("INFO", f"Assuming NTP-Server is also gateway: {ip_gateway}")
+        self._logger.log("INFO", f"Assuming NTP-Server is also gateway: {self.ip_gateway}")
         return True
 
-    async def connect_ap_and_sta_forever(self):
+    async def connect_ap_or_sta_forever(self):
         """Run Access-Point and Station at the same time, forever:
         - The Access Point is started and kept alive, so the device is always reachable
           via its own Wifi network.
@@ -198,21 +210,37 @@ class Wifi:
 
         while True:
 
-            # Keep the Access Point alive
-            if self.status_ap != "connected as AP":
-                if not await self.connect_as_ap():
-                    await asyncio.sleep(self._try_station_connect_interval)
+            # The calls to status_sta performs the necessary checks to ensure, that the
+            # station and access-point are really connected and have an IP.
+            status_ap = self.status_ap
+            status_sta = self.status_sta
 
-            # Keep the Station connection alive
-            if self.status_sta == "not connected":
-                if not await self.connect_as_client():
-                    # Failed to connect as client. Wait before trying again.
-                    await asyncio.sleep(self._try_station_connect_interval)
-            else:
-                # "connecting" or "connected as client": just wait until next call of
-                # this loop. The status properties detect a lost connection and reset
-                # the status to "not connected".
-                await asyncio.sleep(1)
+            # This is the goal to reach: Only connect to the router as station, no access point.
+            if status_sta == "connected as client" and status_ap == "not connected":
+                self._logger.log("DEBUG", "Station is connected, Access Point is not running. Nothing to do.")
+
+            # If station-Interface and access-point are connected, turn off the Access Point, 
+            # because we don't need it anymore.
+            elif status_sta == "connected as client" and status_ap == "connected as AP":
+                self._logger.log("INFO", "Station is connected, Access Point is still up, so turning off Access Point.")
+                self.disconnect_ap()
+
+            # Try to connect to the router as station, if not already connected. If that is successful,
+            # turn off the Access Point, because we don't need it anymore. But if connection as station fails, 
+            # start the Access Point, if it is not already running.
+            elif status_sta == "not connected":
+                await self.connect_as_client()
+                # Call to self.status_sta performs the necessary checks to ensure, that the station is really connected and has an IP.
+                if self.status_sta == "connected as client":
+                    if status_ap == "connected as AP":
+                        self._logger.log("INFO", "Successfully connected to Wifi as Client, so turn off Access Point.")
+                        self.disconnect_ap()
+                else:
+                    if status_ap == "not connected":
+                        self._logger.log("INFO", "Failed to connect to Wifi as Client, Access Point is not running, so starting Access Point.")
+                        await self.connect_as_ap()
+
+            await asyncio.sleep(self._try_station_connect_interval)
 
 
 if __name__ == "__main__":
@@ -240,7 +268,7 @@ if __name__ == "__main__":
             print(f"network.{key} = {getattr(network, key)}")
 
     async def main():
-        asyncio.create_task(wifi.connect_ap_and_sta_forever())
+        asyncio.create_task(wifi.connect_ap_or_sta_forever())
         while True:
             await asyncio.sleep(10)
             print(f"Wifi-Status AP: {wifi.status_ap}, STA: {wifi.status_sta}, IP-Address: {wifi.ip_address}, Netmask: {wifi.netmask}, Gateway: {wifi.ip_gateway}, DNS: {wifi.ip_dns_server}, NTP-Server: {wifi.ntpserver}")

@@ -46,7 +46,7 @@ microdot_app = MicrodotApp(config=config,
 async def main():
     # Start wifi-connection-loop as background task.
     logger.log("INFO", "Starting Wifi connection...")
-    asyncio.create_task(wifi.connect_ap_and_sta_forever())
+    asyncio.create_task(wifi.connect_ap_or_sta_forever())
     # wait for wifi to connect (without wifi-connection, there is no use to continue anything further)
     while not wifi.status.startswith("connected as"):
         await asyncio.sleep(1)
@@ -85,4 +85,6 @@ async def main():
     machine.reset()
 
 asyncio.run(main())
+utime.sleep(1)
+machine.reset()
         

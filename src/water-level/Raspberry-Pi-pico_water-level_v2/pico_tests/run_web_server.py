@@ -24,7 +24,7 @@ wifi = WifiManager(cfg.ap_ssid_prefix, cfg.ap_password,
                    connect_timeout=15, retry_interval=10, log_level="INFO")
 ntp = NetworkTimeService(wifi, log_level="INFO")
 redis = RedisClientService(wifi, cfg.redis_server, cfg.redis_port or 6379, log_level="INFO")
-sensor = UltrasonicSensor(log_level="INFO")
+sensor = UltrasonicSensor(config=cfg, ntp=ntp, redis=redis, log_level="INFO")
 
 
 async def main():

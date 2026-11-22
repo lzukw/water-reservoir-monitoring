@@ -1,5 +1,6 @@
 import os
 import sys
+import time as _time
 import types
 
 # Make the Pico project files (logger.py, config.py, ...) importable on the host.
@@ -10,6 +11,15 @@ if PROJECT_ROOT not in sys.path:
 LIB = os.path.join(PROJECT_ROOT, "lib")
 if LIB not in sys.path:
     sys.path.insert(0, LIB)
+
+# ---------------------------------------------------------------------------
+# CPython stand-in for MicroPython's time.sleep_us, so production code can
+# call time.sleep_us() unconditionally (on the Pico it comes from firmware).
+# ---------------------------------------------------------------------------
+if not hasattr(_time, "sleep_us"):
+    def _sleep_us(us):
+        _time.sleep(us / 1_000_000.0)
+    _time.sleep_us = _sleep_us
 
 # ---------------------------------------------------------------------------
 # Dummy MicroPython-only modules for CPython host tests. Installed into
@@ -39,8 +49,6 @@ if "network" not in sys.modules:  # CPython has no `network` module
     sys.modules["network"] = _network
 
 if "machine" not in sys.modules:  # CPython has no `machine` module
-    import time as _time
-
     _machine = types.ModuleType("machine")
 
     class ResetCalled(BaseException):
@@ -76,4 +84,32 @@ if "machine" not in sys.modules:  # CPython has no `machine` module
     # like on the Pico, machine.RTC() is a singleton
     _rtc_singleton = _DummyRTC()
     _machine.RTC = lambda: _rtc_singleton
+
+    class _DummyPin:
+        """Stand-in for machine.Pin on CPython host tests (moved here from
+        ultrasonic_sensor.py's old _default_pin_factory): stores the output
+        value, input reads always return the stored value."""
+
+        OUT = 1
+        IN = 0
+
+        def __init__(self, pin, mode=-1):
+            self.pin = pin
+            self.mode = mode
+            self._val = 0
+
+        def value(self, v=None):
+            if v is None:
+                return self._val
+            self._val = v
+
+    _machine.Pin = _DummyPin
+
+    def _time_pulse_us(pin, level, timeout_us):
+        """Stand-in for machine.time_pulse_us (moved here from
+        ultrasonic_sensor.py's old _default_pulse_fn): there is no real echo
+        on the host, so always report a timeout (-1)."""
+        return -1
+
+    _machine.time_pulse_us = _time_pulse_us
     sys.modules["machine"] = _machine

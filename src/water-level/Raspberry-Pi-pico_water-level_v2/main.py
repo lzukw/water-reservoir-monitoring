@@ -18,6 +18,7 @@ import gc
 import time
 
 import machine
+import network
 
 from config import Config
 from logger import Logger
@@ -28,40 +29,14 @@ from ultrasonic_sensor import UltrasonicSensor
 from web_app import WebApp
 from wifi import WifiManager
 
-GLOBAL_LOG_LEVEL = "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+GLOBAL_LOG_LEVEL = "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 
 logger = Logger("MAIN", level=GLOBAL_LOG_LEVEL)
 
 WIFI_WAIT_TIMEOUT_S = 60
 WATCHDOG_INTERVAL_S = 5
 
-
-async def sensor_loop(sensor, config, ntp, redis, interval_s):
-    """Measure the water level every interval_s and publish the latest value
-    to redis (when redis is connected and time has been synced at least once).
-    Never raises."""
-    while True:
-        try:
-            distance, level = sensor.measure_water_level(config.distance_to_bottom)
-            if distance is not None and level is not None:
-                logger.info(f"distance {distance:.2f} m -> water level {level:.2f} m")
-                if ntp.time_status != "not valid" and redis.status == "connected":
-                    ok = redis.publish_hash(config.redis_key, {
-                        config.redis_hashkey_timestamp: ntp.current_time_utc_iso(),
-                        config.redis_hashkey_value: f"{level:.2f}",
-                    })
-                    if ok:
-                        logger.info(f"published water level to redis key '{config.redis_key}'")
-                    else:
-                        logger.warning("redis publish failed (latest value kept, will retry)")
-                else:
-                    logger.info(f"skip publish: ntp={ntp.time_status} redis={redis.status} (latest value kept)")
-            else:
-                logger.warning("no valid distance measurement this cycle")
-        except Exception as e:  # noqa: BLE001
-            logger.error(f"sensor loop error: {e}")
-        gc.collect()
-        await asyncio.sleep(interval_s)
+DEFUALT_MEASUREMENT_INTERVAL_S = 5  # seconds
 
 
 async def main():
@@ -70,7 +45,6 @@ async def main():
     logger.info(f"config loaded (status={config.status}), hostname={config.hostname}")
 
     try:
-        import network
         if config.hostname:
             network.hostname(config.hostname)
     except Exception as e:  # noqa: BLE001
@@ -82,12 +56,22 @@ async def main():
                        station_password=config.station_password or "",
                        connect_timeout=20, retry_interval=10,
                        log_level=GLOBAL_LOG_LEVEL)
+    
     ntp = NetworkTimeService(wifi, log_level=GLOBAL_LOG_LEVEL)
-    redis = RedisClientService(wifi, config.redis_server or "", config.redis_port or 6379,
-                         retry_interval=5, check_interval=30, log_level=GLOBAL_LOG_LEVEL,
-                         password=config.get("redis_password", "") or "")
-    sensor = UltrasonicSensor(log_level=GLOBAL_LOG_LEVEL)
-    interval_s = int(config.get("measurement_interval_s", 5) or 5)
+
+    redis = RedisClientService(wifi, 
+                               config.redis_server or "", 
+                               config.redis_port or 6379,
+                               retry_interval=5, 
+                               check_interval=30, 
+                               log_level=GLOBAL_LOG_LEVEL,
+                               password=config.get("redis_password", "") or "")
+    
+    sensor = UltrasonicSensor(config=config, 
+                              ntp=ntp, 
+                              redis=redis,
+                              interval_s=DEFUALT_MEASUREMENT_INTERVAL_S, 
+                              log_level=GLOBAL_LOG_LEVEL)
 
     async def apply_config_and_restart():
         # give the HTTP response time to reach the client, then reset
@@ -110,7 +94,7 @@ async def main():
 
     ntp_task = asyncio.create_task(ntp.run_forever())
     redis_task = asyncio.create_task(redis.run_forever())
-    sensor_task = asyncio.create_task(sensor_loop(sensor, config, ntp, redis, interval_s))
+    sensor_task = asyncio.create_task(sensor.run_forever())
 
     app = web.get_app()
     logger.info("starting web server on http://0.0.0.0:80")

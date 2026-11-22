@@ -17,8 +17,13 @@ import asyncio
 
 from microdot import Microdot
 from microdot.utemplate import Template
+from ntp_time import NetworkTimeService
+from ultrasonic_sensor import UltrasonicSensor
 
+from config import Config
 from logger import Logger
+from redis_client import RedisClient
+from wifi import WifiManager
 
 Template.initialize(template_dir="templates")
 
@@ -43,8 +48,16 @@ def clamp_int(value, min_value, max_value, fallback):
 
 
 class WebApp:
-    def __init__(self, config, wifi, ntp, redis_service, sensor,
-                 on_apply=None, log_level: str = "INFO"):
+    def __init__(
+            self, 
+            config: Config, 
+            wifi: WifiManager, 
+            ntp: NetworkTimeService, 
+            redis_service: RedisClient, 
+            sensor: UltrasonicSensor,
+            on_apply=None, 
+            log_level: str = "INFO"
+        ):
         self._config = config
         self._wifi = wifi
         self._ntp = ntp

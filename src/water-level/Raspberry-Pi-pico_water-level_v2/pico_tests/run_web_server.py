@@ -11,7 +11,7 @@ import asyncio
 
 from config import Config
 from ntp_time import NetworkTimeService
-from redis_client import RedisService
+from redis_client import RedisClientService
 from ultrasonic_sensor import UltrasonicSensor
 from web_app import WebApp
 from wifi import WifiManager
@@ -23,7 +23,7 @@ wifi = WifiManager(cfg.ap_ssid_prefix, cfg.ap_password,
                    cfg.station_ssid or "", cfg.station_password or "",
                    connect_timeout=15, retry_interval=10, log_level="INFO")
 ntp = NetworkTimeService(wifi, log_level="INFO")
-redis = RedisService(cfg.redis_server, cfg.redis_port or 6379, log_level="INFO")
+redis = RedisClientService(wifi, cfg.redis_server, cfg.redis_port or 6379, log_level="INFO")
 sensor = UltrasonicSensor(log_level="INFO")
 
 

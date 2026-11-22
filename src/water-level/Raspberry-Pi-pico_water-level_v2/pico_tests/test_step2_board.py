@@ -9,7 +9,7 @@ if "/pico_tests" not in sys.path:
     sys.path.insert(0, "/pico_tests")
 
 from config import Config
-from redis_client import RedisClient, RedisError, RedisService
+from redis_client import RedisClient, RedisError, RedisClientService
 from tinytest import run_tests
 
 
@@ -50,7 +50,7 @@ def test_refused_port_fails_cleanly():
 
 
 def test_service_publish_latest_only():
-    svc = RedisService(_host(), 6379, timeout=5, password=_password())
+    svc = RedisClientService(_host(), 6379, timeout=5, password=_password())
     assert svc.connect_once() is True
     assert svc.status == "connected"
     assert svc.publish_hash("water-level-test", {"value": "0.1"}) is True
@@ -60,7 +60,7 @@ def test_service_publish_latest_only():
 
 
 def test_service_down_server_is_skipped():
-    svc = RedisService(_host(), 6399, retry_interval=1, check_interval=1, timeout=3)
+    svc = RedisClientService(_host(), 6399, retry_interval=1, check_interval=1, timeout=3)
     assert svc.connect_once() is False
     assert svc.status == "disconnected"
     assert svc.publish_hash("water-level-test", {"value": "x"}) is False

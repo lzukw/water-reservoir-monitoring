@@ -6,9 +6,18 @@ import time
 
 import pytest
 
-from redis_client import RedisClient, RedisError, RedisService
+import redis_client as redis_module
+from redis_client import RedisClient, RedisError, RedisClientService
 
 REDIS_PORT = 6399  # dedicated test instance, does not touch the main redis on 6379
+
+
+@pytest.fixture(autouse=True)
+def _fake_host_ping(monkeypatch):
+    """RedisClient.connect() pre-pings host:port via ping.py tcp_ping; fake a
+    successful ping on the CPython host (tests that need a failing ping
+    override this again)."""
+    monkeypatch.setattr(redis_module, "tcp_ping", lambda host, port, timeout_ms: True)
 
 
 def _wait_port_open(port, timeout=5.0):
@@ -33,6 +42,13 @@ def _wait_port_closed(port, timeout=5.0):
         except OSError:
             return True
     return False
+
+
+class FakeWifi:
+    """Duck-typed stand-in for WifiManager: the redis service only needs .status."""
+
+    def __init__(self, status="connected as client"):
+        self.status = status
 
 
 class RedisServerProc:
@@ -158,10 +174,10 @@ def test_numeric_and_float_args_are_encoded():
     r.stop()
 
 
-# ------------------------------------------------------------ RedisService
+# ------------------------------------------------------------ RedisClientService
 def test_service_publish_when_down_is_skipped_and_latest_is_published_after_recovery():
     r = RedisServerProc()
-    svc = RedisService("127.0.0.1", REDIS_PORT, log_level="ERROR",
+    svc = RedisClientService(FakeWifi(), "127.0.0.1", REDIS_PORT, log_level="ERROR",
                        retry_interval=0.2, check_interval=0.3)
     # server down: connect fails, publish returns False (nothing buffered)
     assert svc.connect_once() is False
@@ -191,7 +207,7 @@ def test_service_publish_when_down_is_skipped_and_latest_is_published_after_reco
 def test_service_run_forever_recovers_automatically():
     async def scenario():
         r = RedisServerProc().start()
-        svc = RedisService("127.0.0.1", REDIS_PORT, log_level="ERROR",
+        svc = RedisClientService(FakeWifi(), "127.0.0.1", REDIS_PORT, log_level="ERROR",
                            retry_interval=0.2, check_interval=0.3)
         task = asyncio.create_task(svc.run_forever())
         try:
@@ -297,7 +313,7 @@ def test_service_run_forever_survives_unreachable_host():
     """Point at a port where nothing listens: loop must keep running, not die."""
     async def scenario():
         RedisServerProc().stop()
-        svc = RedisService("127.0.0.1", REDIS_PORT, log_level="ERROR",
+        svc = RedisClientService(FakeWifi(), "127.0.0.1", REDIS_PORT, log_level="ERROR",
                            retry_interval=0.2, check_interval=0.3, timeout=0.5)
         task = asyncio.create_task(svc.run_forever())
         await asyncio.sleep(1.0)
@@ -311,3 +327,66 @@ def test_service_run_forever_survives_unreachable_host():
             pass
 
     asyncio.run(scenario())
+
+
+def test_service_skips_connect_while_wifi_not_sta(monkeypatch):
+    """AP mode (router down): no DNS server exists, so a connect attempt would
+    block the event loop for seconds inside getaddrinfo(). While wifi is not
+    'connected as client' the service must NOT attempt to connect at all."""
+    svc = RedisClientService(FakeWifi("connected as AP"), "host-that-needs-dns", REDIS_PORT,
+                       log_level="ERROR", retry_interval=0.05)
+    calls = []
+    monkeypatch.setattr(svc, "connect_once", lambda: calls.append(1) or False)
+
+    async def scenario():
+        task = asyncio.create_task(svc.run_forever())
+        await asyncio.sleep(0.3)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(scenario())
+    assert calls == []                       # no connect attempt was made
+    assert svc.status == "disconnected"
+    assert svc.last_error == "wifi not connected as client"
+
+
+def test_service_connects_normally_when_wifi_is_sta():
+    """With wifi 'connected as client' the guard is inactive and connecting
+    works as before."""
+    r = RedisServerProc().start()
+    try:
+        svc = RedisClientService(FakeWifi("connected as client"), "127.0.0.1", r.port,
+                           log_level="ERROR")
+        assert svc.connect_once() is True
+        assert svc.status == "connected"
+        assert svc.publish_hash("k", {"v": "1"}) is True
+    finally:
+        r.stop()
+
+
+def test_connect_aborts_fast_when_host_does_not_ping(monkeypatch):
+    """If the TCP pre-ping to host:port fails, connect() must abort immediately
+    instead of burning the TCP connect timeout - this keeps the loop live."""
+    monkeypatch.setattr(redis_module, "tcp_ping", lambda host, port, timeout_ms: False)
+    svc = RedisClientService(FakeWifi(), "10.255.255.1", REDIS_PORT, log_level="ERROR",
+                       timeout=5.0)
+    t0 = time.monotonic()
+    assert svc.connect_once() is False
+    assert time.monotonic() - t0 < 2.0  # returned fast, no 5 s TCP timeout
+    assert svc.status == "disconnected"
+    assert "failed" in svc.last_error
+
+
+def test_connect_proceeds_when_host_pings():
+    """Host answers the pre-ping -> normal TCP connect + AUTH/PING happens."""
+    r = RedisServerProc().start()
+    try:
+        svc = RedisClientService(FakeWifi(), "127.0.0.1", r.port, log_level="ERROR", timeout=2.0)
+        assert svc.connect_once() is True  # ping is faked True by the autouse fixture
+        assert svc.status == "connected"
+        assert svc.publish_hash("k", {"v": "1"}) is True
+    finally:
+        r.stop()

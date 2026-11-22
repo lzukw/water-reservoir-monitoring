@@ -12,7 +12,7 @@ back.
 ```
 main.py ──► WifiManager (wifi.py)        station first, AP fallback, auto-recovery
         ──► NetworkTimeService (ntp_time.py)   own NTP client (UDP), RTC sync, resync loop
-        ──► RedisService (redis_client.py)     own RESP client, AUTH, auto-reconnect,
+        ──► RedisClientService (redis_client.py)     own RESP client, AUTH, auto-reconnect,
                                                latest-value-only publish (no buffering)
         ──► sensor_loop → UltrasonicSensor (ultrasonic_sensor.py)  median of N shots
         ──► WebApp (web_app.py + templates/)   config form + /status JSON + /status-page

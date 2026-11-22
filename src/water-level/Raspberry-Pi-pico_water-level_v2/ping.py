@@ -74,20 +74,32 @@ def _icmp_ping(addr: str, timeout_ms: int) -> bool:
         s.close()
 
 
+def tcp_ping(host: str, port: int, timeout_ms: int = 1000) -> bool:
+    """True if a TCP connect to host:port succeeds within timeout_ms.
+    Bounded by timeout_ms (DNS resolution of `host` is the only unbounded
+    part). Never raises."""
+    if not host:
+        return False
+    try:
+        addr = socket.getaddrinfo(host, port)[0][-1]
+    except Exception:  # noqa: BLE001
+        return False
+    s = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(timeout_ms / 1000.0)
+        s.connect(addr)
+        return True
+    except OSError:
+        return False
+    finally:
+        if s is not None:
+            s.close()
+
+
 def _tcp_probe(addr: str, timeout_ms: int) -> bool:
-    for port in (53, 80):
-        s = None
-        try:
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(timeout_ms / 1000.0)
-            s.connect((addr, port))
-            return True
-        except OSError:
-            pass
-        finally:
-            if s is not None:
-                s.close()
-    return False
+    """TCP fallback for ping(): try the usual DNS/HTTP ports on an IP."""
+    return tcp_ping(addr, 53, timeout_ms) or tcp_ping(addr, 80, timeout_ms)
 
 
 def ping(host: str, timeout_ms: int = 1000) -> bool:

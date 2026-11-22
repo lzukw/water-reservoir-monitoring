@@ -23,6 +23,7 @@ import machine
 from logger import Logger
 from timeutil import elapsed_ms as _elapsed_ms
 from timeutil import now_ms as _now_ms
+from wifi import WifiManager
 
 NTP_PORT = 123
 NTP_DELTA_1900_TO_1970 = 2208988800  # seconds between 1900-01-01 and 1970-01-01
@@ -110,7 +111,7 @@ class NetworkTimeService:
     every `retry_interval` seconds and resumes syncing automatically when the
     connection returns."""
 
-    def __init__(self, wifi, ntp_server: str = "", ntp_port: int = NTP_PORT,
+    def __init__(self, wifi : WifiManager, ntp_server: str = "", ntp_port: int = NTP_PORT,
                  period: int = 6 * 60 * 60, valid_time_threshold: int = 24 * 60 * 60,
                  retry_interval: float = 10.0, timeout: float = 3.0,
                  log_level: str = "INFO"):
@@ -153,7 +154,7 @@ class NetworkTimeService:
     def _server(self) -> str:
         if self._ntp_server:
             return self._ntp_server
-        gw = getattr(self._wifi, "gateway", "") or ""
+        gw = self._wifi.gateway
         if gw:
             return gw  # assume the router is also an NTP server
         return "pool.ntp.org"
@@ -161,7 +162,7 @@ class NetworkTimeService:
     def sync_once(self) -> bool:
         """One sync attempt. Returns True if the RTC was set from NTP.
         Bounded blocking: at most ~timeout seconds (+DNS)."""
-        if getattr(self._wifi, "status", "") != "connected as client":
+        if self._wifi.status != "connected as client":
             self._logger.info("Not connected as wifi client - cannot sync time now.")
             return False
         server = self._server()

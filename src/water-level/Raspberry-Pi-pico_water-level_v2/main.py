@@ -22,7 +22,7 @@ import machine
 from config import Config
 from logger import Logger
 from ntp_time import NetworkTimeService
-from redis_client import RedisService
+from redis_client import RedisClientService
 from timeutil import elapsed_ms, now_ms
 from ultrasonic_sensor import UltrasonicSensor
 from web_app import WebApp
@@ -83,7 +83,7 @@ async def main():
                        connect_timeout=20, retry_interval=10,
                        log_level=GLOBAL_LOG_LEVEL)
     ntp = NetworkTimeService(wifi, log_level=GLOBAL_LOG_LEVEL)
-    redis = RedisService(config.redis_server or "", config.redis_port or 6379,
+    redis = RedisClientService(wifi, config.redis_server or "", config.redis_port or 6379,
                          retry_interval=5, check_interval=30, log_level=GLOBAL_LOG_LEVEL,
                          password=config.get("redis_password", "") or "")
     sensor = UltrasonicSensor(log_level=GLOBAL_LOG_LEVEL)

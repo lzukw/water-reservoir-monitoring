@@ -6,7 +6,6 @@ import sys
 if "/pico_tests" not in sys.path:
     sys.path.insert(0, "/pico_tests")
 
-import machine
 import network
 
 from ntp_time import NetworkTimeService, NtpClient
@@ -49,7 +48,7 @@ def test_fetch_from_internet_pool():
 
 
 def test_service_syncs_rtc_and_reports_status():
-    svc = NetworkTimeService(_StaWifi(), ntp_server="", rtc=machine.RTC(), log_level="INFO")
+    svc = NetworkTimeService(_StaWifi(), ntp_server="", log_level="INFO")
     assert svc.time_status == "not valid" or True  # RTC may already be set from a previous run
     assert svc.sync_once() is True
     iso = svc.current_time_utc_iso()

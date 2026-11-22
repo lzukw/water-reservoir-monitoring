@@ -39,6 +39,7 @@ module comes back freshly initialized after the reboot.
 
 import asyncio
 
+import machine
 import network
 
 from logger import Logger
@@ -328,7 +329,6 @@ class WifiManager:
             self._logger.error(f"watchdog: station not connected, STA status={sta_status} "
                                f"does not indicate a down router -> hard reset "
                                f"(machine.reset(); on Pico W this also resets the CYW43)")
-            import machine
             machine.reset()  # never returns on real hardware
         except Exception as e:  # noqa: BLE001 - the watchdog must never kill the loop
             self._logger.error(f"watchdog error: {e}")

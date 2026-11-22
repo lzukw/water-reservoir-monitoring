@@ -11,12 +11,14 @@ Written from scratch (no ntptime module) so it runs unchanged on MicroPython
   lost, time_status degrades ("accurate" -> "inaccurate" -> "not valid") and
   syncing resumes automatically when the connection is back.
 
-The RTC is injectable (machine.RTC() on the Pico, a fake on the host).
+The RTC is machine.RTC() (on the CPython host tests, the dummy machine
+module from tests/conftest.py provides it).
 """
 
 import asyncio
 import socket
-import time
+
+import machine
 
 from logger import Logger
 from timeutil import elapsed_ms as _elapsed_ms
@@ -101,21 +103,6 @@ class NtpClient:
                     pass
 
 
-class _CpythonRtc:
-    """Fallback RTC on CPython (host): stores the tuple, cannot set system clock."""
-
-    def __init__(self):
-        self._dt = None
-
-    def datetime(self, dt=None):
-        if dt is None:
-            if self._dt is not None:
-                return self._dt
-            t = time.gmtime()
-            return (t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)
-        self._dt = tuple(dt)
-
-
 class NetworkTimeService:
     """Keeps the RTC synced via NTP while the Pico has a wifi station connection.
 
@@ -125,7 +112,7 @@ class NetworkTimeService:
 
     def __init__(self, wifi, ntp_server: str = "", ntp_port: int = NTP_PORT,
                  period: int = 6 * 60 * 60, valid_time_threshold: int = 24 * 60 * 60,
-                 retry_interval: float = 10.0, rtc=None, timeout: float = 3.0,
+                 retry_interval: float = 10.0, timeout: float = 3.0,
                  log_level: str = "INFO"):
         self._wifi = wifi  # duck-typed: needs .status and .gateway
         self._ntp_server = ntp_server
@@ -135,13 +122,7 @@ class NetworkTimeService:
         self._retry_interval = retry_interval
         self._client = NtpClient(timeout=timeout)
         self._logger = Logger("NTP", log_level)
-        if rtc is None:
-            try:
-                import machine
-                rtc = machine.RTC()
-            except ImportError:
-                rtc = _CpythonRtc()
-        self._rtc = rtc
+        self._rtc = machine.RTC()
         self._last_sync_ticks = None  # ms ticks of last successful sync
 
     # ------------------------------------------------------------- status

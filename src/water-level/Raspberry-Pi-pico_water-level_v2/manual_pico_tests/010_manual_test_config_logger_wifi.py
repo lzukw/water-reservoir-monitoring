@@ -12,7 +12,6 @@ GLOBAL_LOG_LEVEL = "DEBUG"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
 config = Config("config.json", log_level=GLOBAL_LOG_LEVEL)
 config.read_from_file()
 logger = Logger("MAIN", level=GLOBAL_LOG_LEVEL)
-WIFI_WAIT_TIMEOUT_S = 60
 
 # Firmware info (relevant: CYW43 driver fixes landed in newer MicroPython)
 print(f"MicroPython implementation: {sys.implementation}")

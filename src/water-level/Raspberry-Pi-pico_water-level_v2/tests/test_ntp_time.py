@@ -5,6 +5,7 @@ import socket
 import threading
 import time
 
+import machine  # dummy from conftest.py (CPython host)
 import pytest
 
 from ntp_time import (
@@ -61,20 +62,17 @@ class FakeNtpServer(threading.Thread):
         self.sock.close()
 
 
-class FakeRTC:
-    def __init__(self):
-        self.dt = None
-
-    def datetime(self, dt=None):
-        if dt is None:
-            return self.dt or (2000, 1, 1, 5, 0, 0, 0, 0)
-        self.dt = tuple(dt)
-
-
 class FakeWifi:
     def __init__(self, status="not connected", gateway=""):
         self.status = status
         self.gateway = gateway
+
+
+@pytest.fixture(autouse=True)
+def _fresh_rtc():
+    """machine.RTC() is a singleton (like on the Pico) - reset it per test."""
+    machine.RTC().dt = None
+    yield
 
 
 @pytest.fixture
@@ -131,11 +129,22 @@ def test_fetch_timeout_is_bounded_and_does_not_accumulate():
 
 
 # ---------------------------------------------------- NetworkTimeService
+def test_service_default_rtc_comes_from_machine_module(ntp_server):
+    """No rtc= passed -> ntp_time does `import machine; machine.RTC()`.
+    On the CPython host that is the dummy machine module from conftest.py."""
+    wifi = FakeWifi(status="connected as client", gateway="127.0.0.1")
+    svc = NetworkTimeService(wifi, ntp_server="127.0.0.1", ntp_port=ntp_server.port,
+                             log_level="ERROR")
+    assert svc._rtc is machine.RTC()  # singleton, like on the Pico
+    assert svc.sync_once() is True
+    assert svc._rtc.datetime()[:7] == (2026, 11, 21, 5, 15, 30, 0)
+
+
 def test_service_sync_status_and_iso(ntp_server):
     wifi = FakeWifi(status="connected as client", gateway="127.0.0.1")
-    rtc = FakeRTC()
+    rtc = machine.RTC()
     svc = NetworkTimeService(wifi, ntp_server="127.0.0.1", ntp_port=ntp_server.port,
-                             valid_time_threshold=3600, rtc=rtc, log_level="ERROR")
+                             valid_time_threshold=3600, log_level="ERROR")
     assert svc.time_status == "not valid"
     assert svc.last_sync_age is None
     assert svc.sync_once() is True
@@ -148,14 +157,14 @@ def test_service_sync_status_and_iso(ntp_server):
 def test_service_uses_gateway_as_default_ntp_server(ntp_server):
     wifi = FakeWifi(status="connected as client", gateway="127.0.0.1")
     svc = NetworkTimeService(wifi, ntp_server="", ntp_port=ntp_server.port,
-                             rtc=FakeRTC(), log_level="ERROR")
+                             log_level="ERROR")
     assert svc._server() == "127.0.0.1"  # fell back to gateway
 
 
 def test_service_not_connected_as_client(ntp_server):
     wifi = FakeWifi(status="connected as AP")
     svc = NetworkTimeService(wifi, ntp_server="127.0.0.1", ntp_port=ntp_server.port,
-                             rtc=FakeRTC(), log_level="ERROR")
+                             log_level="ERROR")
     assert svc.sync_once() is False
     assert svc.time_status == "not valid"
     assert ntp_server.received == 0  # no request was sent
@@ -164,7 +173,7 @@ def test_service_not_connected_as_client(ntp_server):
 def test_service_inaccurate_when_stale():
     wifi = FakeWifi(status="connected as client", gateway="127.0.0.1")
     svc = NetworkTimeService(wifi, ntp_server="127.0.0.1", ntp_port=1,
-                             valid_time_threshold=100, rtc=FakeRTC(), log_level="ERROR")
+                             valid_time_threshold=100, log_level="ERROR")
     svc._last_sync_ticks = int(time.monotonic() * 1000) - 200_000  # 200 s ago
     assert svc.time_status == "inaccurate"
     assert 199 <= svc.last_sync_age <= 202
@@ -173,10 +182,10 @@ def test_service_inaccurate_when_stale():
 def test_run_forever_recovers_after_outage(ntp_server):
     async def scenario():
         wifi = FakeWifi(status="not connected")  # outage: no sta connection
-        rtc = FakeRTC()
+        rtc = machine.RTC()
         svc = NetworkTimeService(wifi, ntp_server="127.0.0.1", ntp_port=ntp_server.port,
                                  period=3600, valid_time_threshold=3600,
-                                 retry_interval=0.2, rtc=rtc, log_level="ERROR")
+                                 retry_interval=0.2, log_level="ERROR")
         task = asyncio.create_task(svc.run_forever())
         try:
             await asyncio.sleep(0.6)

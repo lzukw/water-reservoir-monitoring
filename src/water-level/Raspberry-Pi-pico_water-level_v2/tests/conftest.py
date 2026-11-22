@@ -39,6 +39,8 @@ if "network" not in sys.modules:  # CPython has no `network` module
     sys.modules["network"] = _network
 
 if "machine" not in sys.modules:  # CPython has no `machine` module
+    import time as _time
+
     _machine = types.ModuleType("machine")
 
     class ResetCalled(BaseException):
@@ -54,4 +56,24 @@ if "machine" not in sys.modules:  # CPython has no `machine` module
         raise ResetCalled("simulated machine.reset()")
 
     _machine.reset = _reset
+
+    class _DummyRTC:
+        """Stand-in for machine.RTC() on CPython host tests: stores the
+        datetime tuple in `.dt`, cannot set the system clock. datetime()
+        with no argument returns the stored tuple or the current UTC time."""
+
+        def __init__(self):
+            self.dt = None
+
+        def datetime(self, dt=None):
+            if dt is None:
+                if self.dt is not None:
+                    return self.dt
+                t = _time.gmtime()
+                return (t[0], t[1], t[2], t[6], t[3], t[4], t[5], 0)
+            self.dt = tuple(dt)
+
+    # like on the Pico, machine.RTC() is a singleton
+    _rtc_singleton = _DummyRTC()
+    _machine.RTC = lambda: _rtc_singleton
     sys.modules["machine"] = _machine

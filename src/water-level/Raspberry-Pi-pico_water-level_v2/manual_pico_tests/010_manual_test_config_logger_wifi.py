@@ -1,4 +1,5 @@
 import asyncio
+import sys
 
 import network
 
@@ -12,6 +13,20 @@ config = Config("config.json", log_level=GLOBAL_LOG_LEVEL)
 config.read_from_file()
 logger = Logger("MAIN", level=GLOBAL_LOG_LEVEL)
 WIFI_WAIT_TIMEOUT_S = 60
+
+# Firmware info (relevant: CYW43 driver fixes landed in newer MicroPython)
+print(f"MicroPython implementation: {sys.implementation}")
+
+# Enable the CYW43 driver-level trace on both WLAN interfaces - essential to
+# diagnose a stuck STAT_CONNECTING (watch for "join"/"DHCP" events in the
+# driver output). network.WLAN(if_id) is a singleton on the Pico, so this
+# configures the very same objects that WifiManager creates internally.
+for _if, _name in ((network.STA_IF, "STA"), (network.AP_IF, "AP")):
+    try:
+        network.WLAN(_if).config(trace=1)
+        print(f"{_name}: CYW43 driver trace enabled")
+    except OSError as e:
+        print(f"{_name}: driver trace not supported: {e}")
 
 wifi = WifiManager(ap_ssid_prefix=config.ap_ssid_prefix or "RPi-Pico-Water-Level",
                     ap_password=config.ap_password or "1234567890",
@@ -34,6 +49,10 @@ keys = dir(network)
 for key in keys:
       if key.startswith("STAT_"):
             print(f"network.{key} = {getattr(network, key)}")
+# Print power-management constants of the WLAN class (wifi.py sets pm=PM_NONE)
+for key in dir(network.WLAN):
+      if key.startswith("PM_"):
+            print(f"network.WLAN.{key} = {getattr(network.WLAN, key)}")
 print()
 
 

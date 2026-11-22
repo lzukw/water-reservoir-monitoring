@@ -1,0 +1,4 @@
+WEB READY on port 80
+[INFO   ] NTP: Time synced from NTP 192.168.178.1:123 -> 2026-11-21T16:22:56.000Z
+[INFO   ] Redis: Connected to Redis at 192.168.178.20:6379
+[INFO   ] Web: GET / from ('192.168.178.20', 51502)

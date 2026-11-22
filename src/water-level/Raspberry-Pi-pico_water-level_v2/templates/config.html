@@ -1,0 +1,62 @@
+{% args hostname, ap_ssid_prefix, ap_password, station_ssid, station_password, redis_server, redis_port, redis_key, redis_hashkey_timestamp, redis_hashkey_value, distance_to_bottom_in_cm, message %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Water-Level Setup</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f6f8; display: flex; justify-content: center; padding: 16px; margin: 0; }
+    .card { background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; width: 100%; max-width: 520px; }
+    h1 { font-size: 1.1rem; margin: 0 0 12px; }
+    h2 { font-size: 0.95rem; margin: 16px 0 6px; color: #1f6feb; }
+    .row { margin-bottom: 10px; }
+    label { display: block; font-size: 0.85rem; color: #6b7785; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px; border: 1px solid #d8dee4; border-radius: 8px; box-sizing: border-box; }
+    button { width: 100%; padding: 10px; margin-top: 8px; border: none; border-radius: 8px; background: #1f6feb; color: #fff; font-size: 1rem; cursor: pointer; }
+    .msg { margin-top: 10px; padding: 8px; border-radius: 8px; background: #e8f0ff; color: #1f2933; font-size: 0.9rem; }
+    .links { margin-top: 12px; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>Water-Level Sensor Setup</h1>
+    <form method="post" action="/">
+      <div class="row"><label>Hostname</label>
+        <input name="hostname" value="{{ hostname }}"></div>
+
+      <h2>Access Point (fallback)</h2>
+      <div class="row"><label>AP SSID prefix</label>
+        <input name="ap_ssid_prefix" value="{{ ap_ssid_prefix }}" required></div>
+      <div class="row"><label>AP password</label>
+        <input name="ap_password" value="{{ ap_password }}" required></div>
+
+      <h2>Wifi station (client)</h2>
+      <div class="row"><label>Station SSID</label>
+        <input name="station_ssid" value="{{ station_ssid }}" required></div>
+      <div class="row"><label>Station password</label>
+        <input name="station_password" value="{{ station_password }}" required></div>
+
+      <h2>Redis</h2>
+      <div class="row"><label>Redis server</label>
+        <input name="redis_server" value="{{ redis_server }}" required></div>
+      <div class="row"><label>Redis port</label>
+        <input name="redis_port" type="number" min="1" max="65535" value="{{ redis_port }}" required></div>
+      <div class="row"><label>Redis key</label>
+        <input name="redis_key" value="{{ redis_key }}" required></div>
+      <div class="row"><label>Redis hash field: timestamp</label>
+        <input name="redis_hashkey_timestamp" value="{{ redis_hashkey_timestamp }}" required></div>
+      <div class="row"><label>Redis hash field: value</label>
+        <input name="redis_hashkey_value" value="{{ redis_hashkey_value }}" required></div>
+
+      <h2>Sensor</h2>
+      <div class="row"><label>Distance sensor to bottom of reservoir (cm)</label>
+        <input name="distance_to_bottom_in_cm" type="number" min="25" max="20000" value="{{ distance_to_bottom_in_cm }}" required></div>
+
+      <button type="submit">Save and apply</button>
+      <div class="msg">{{ message }}</div>
+    </form>
+    <div class="links"><a href="/status-page">Status page</a> &middot; <a href="/status">Status JSON</a></div>
+  </main>
+</body>
+</html>

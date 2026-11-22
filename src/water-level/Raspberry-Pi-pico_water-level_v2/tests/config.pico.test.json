@@ -1,0 +1,14 @@
+{
+    "hostname": "rpi-pico-water-level",
+    "ap_ssid_prefix": "RPi-Pico-Water-Level",
+    "ap_password": "1234567890",
+    "station_ssid": "FRITZ!Box 6825 NR",
+    "station_password": "12345678",
+    "redis_server": "192.168.178.20",
+    "redis_key": "water-level",
+    "redis_hashkey_timestamp": "timestamp",
+    "redis_hashkey_value": "value",
+    "redis_port": 6379,
+    "distance_to_bottom": 5.25,
+    "redis_password": "wasser-test-123"
+}

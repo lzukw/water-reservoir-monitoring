@@ -18,7 +18,7 @@ class LEDStrip:
         self._pin : Pin = Pin(self._signal_pin_no, Pin.OUT)
         self._num_leds = num_leds
         self._brightness = 0
-        self._logger : Logger = Logger(name="LEDStrip", log_level=log_level)
+        self._logger : Logger = Logger(name="LEDStrip", level=log_level)
         self.brightness = brightness  # Set initial brightness and update LEDs
 
     @property

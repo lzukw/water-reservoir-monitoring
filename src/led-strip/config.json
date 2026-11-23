@@ -1,12 +1,12 @@
 {
-    "hostname":"rpi-pico-led-strip-1",
+    "hostname":"rpi-pico-led-strip-cam0",
     
     "ap_ssid_prefix":"RPi-Pico-led-strip",
     "ap_password":"1234567890",
 
-    "station_ssid":"Your SSID",
-    "station_password":"Your Password",
+    "station_ssid":"FRITZ!Box 6825 NR",
+    "station_password":"12345678",
     
-    "ledCount": 20,
-    "ledBrightness": 10
+    "led_count": 20,
+    "led_brightness": 10
 }

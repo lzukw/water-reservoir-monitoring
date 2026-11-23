@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>LED Strip Status</title>
+  <style>
+    body { font-family: sans-serif; background: #f4f6f8; display: flex; justify-content: center; padding: 16px; margin: 0; }
+    .card { background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; width: 100%; max-width: 520px; }
+    h1 { font-size: 1.1rem; margin: 0 0 12px; }
+    .row { display: flex; justify-content: space-between; gap: 12px; border: 1px solid #d8dee4; border-radius: 8px; padding: 8px 10px; margin-bottom: 8px; background: #fafbfc; }
+    .label { color: #6b7785; font-weight: 600; }
+    .value { text-align: right; word-break: break-word; }
+    button { width: 100%; padding: 10px; margin-top: 8px; border: 1px solid #1f6feb; border-radius: 8px; background: #1f6feb; color: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <h1>LED Strip Status</h1>
+    <div id="rows"></div>
+    <button type="button" onclick="window.location.href='/'">Back to setup</button>
+  </main>
+  <script>
+    const FIELDS = ["hostname", "wifi_status", "wifi_sta", "wifi_ap", "ap_ssid", "ip", "gateway", "dns",
+                    "led_count", "led_brightness", "config_status"];
+    const rows = document.getElementById('rows');
+    for (const f of FIELDS) {
+      const div = document.createElement('div');
+      div.className = 'row';
+      div.innerHTML = '<span class="label">' + f + '</span><span class="value" id="' + f + '">-</span>';
+      rows.appendChild(div);
+    }
+    async function loadStatus() {
+      try {
+        const r = await fetch('/status', { headers: { 'Accept': 'application/json' } });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const d = await r.json();
+        for (const f of FIELDS) {
+          const el = document.getElementById(f);
+          el.textContent = (d[f] === null || d[f] === undefined) ? '-' : String(d[f]);
+        }
+      } catch (e) {
+        for (const f of FIELDS) document.getElementById(f).textContent = 'error';
+      }
+    }
+    loadStatus();
+    setInterval(loadStatus, 1000);
+  </script>
+</body>
+</html>

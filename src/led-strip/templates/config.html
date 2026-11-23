@@ -1,156 +1,57 @@
 {% args hostname, ap_ssid_prefix, ap_password, station_ssid, station_password, led_count, led_brightness, message %}
 <!doctype html>
-<html lang="de">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>LED Strip Configuration</title>
+  <title>LED Strip Setup</title>
   <style>
-    :root {
-      --bg: #f4f6f8;
-      --card: #ffffff;
-      --text: #1f2933;
-      --muted: #6b7785;
-      --accent: #1f6feb;
-      --accent-soft: #e8f0ff;
-      --border: #d8dee4;
-      --success: #1e6a35;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      min-height: 100vh;
-      background: radial-gradient(circle at 20% 0%, #ffffff 0%, var(--bg) 55%);
-      color: var(--text);
-      font-family: sans-serif;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 16px;
-    }
-    .card {
-      width: 100%;
-      max-width: 560px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px;
-      box-shadow: 0 8px 26px rgba(31, 41, 51, 0.08);
-    }
-    h1 {
-      margin: 0 0 8px;
-      font-size: 1.2rem;
-      font-weight: 600;
-    }
-    p {
-      margin: 0 0 16px;
-      color: var(--muted);
-      font-size: 0.92rem;
-    }
-    .row {
-      margin-bottom: 12px;
-    }
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-size: 0.88rem;
-      color: var(--muted);
-    }
-    input {
-      width: 100%;
-      padding: 10px 12px;
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      font-size: 0.95rem;
-    }
-    .two-col {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-    }
-    .button-row {
-      margin-top: 10px;
-    }
-    button {
-      width: 100%;
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      font-size: 0.95rem;
-      padding: 10px 14px;
-      cursor: pointer;
-      transition: background-color 0.15s ease;
-    }
-    .btn-secondary {
-      color: var(--accent);
-      background: var(--accent-soft);
-      margin-bottom: 8px;
-    }
-    .btn-secondary:active { background: #dce8ff; }
-    .btn-primary {
-      color: #fff;
-      background: var(--accent);
-    }
-    .btn-primary:active { background: #0e5cd1; }
-    .msg {
-      margin-top: 12px;
-      min-height: 1.2em;
-      color: var(--success);
-      font-size: 0.9rem;
-    }
+    body { font-family: sans-serif; background: #f4f6f8; display: flex; justify-content: center; padding: 16px; margin: 0; }
+    .card { background: #fff; border: 1px solid #d8dee4; border-radius: 12px; padding: 18px; width: 100%; max-width: 520px; }
+    h1 { font-size: 1.1rem; margin: 0 0 12px; }
+    h2 { font-size: 0.95rem; margin: 16px 0 6px; color: #1f6feb; }
+    .row { margin-bottom: 10px; }
+    label { display: block; font-size: 0.85rem; color: #6b7785; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px; border: 1px solid #d8dee4; border-radius: 8px; box-sizing: border-box; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { width: 100%; padding: 10px; margin-top: 8px; border: none; border-radius: 8px; background: #1f6feb; color: #fff; font-size: 1rem; cursor: pointer; }
+    .btn-secondary { background: #e8f0ff; color: #1f6feb; }
+    .msg { margin-top: 10px; padding: 8px; border-radius: 8px; background: #e8f0ff; color: #1f2933; font-size: 0.9rem; }
+    .links { margin-top: 12px; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <main class="card">
-    <h1>LED Strip Configuration</h1>
-    <p>Setup for WLAN and LED strip.</p>
+    <h1>LED Strip Setup</h1>
+    <form method="post" action="/">
+      <div class="row"><label>Hostname</label>
+        <input name="hostname" value="{{ hostname }}"></div>
 
-    <form method="post">
-      <div class="row">
-        <label for="hostname">Hostname</label>
-        <input id="hostname" name="hostname" value="{{ hostname }}">
-      </div>
+      <h2>Access Point (fallback)</h2>
+      <div class="row"><label>AP SSID prefix</label>
+        <input name="ap_ssid_prefix" value="{{ ap_ssid_prefix }}" required></div>
+      <div class="row"><label>AP password</label>
+        <input name="ap_password" value="{{ ap_password }}" required></div>
 
-      <div class="row">
-        <label for="ap_ssid_prefix">AP-Mode SSID Prefix</label>
-        <input id="ap_ssid_prefix" name="ap_ssid_prefix" value="{{ ap_ssid_prefix }}" required>
-      </div>
+      <h2>Wifi station (client)</h2>
+      <div class="row"><label>Station SSID</label>
+        <input name="station_ssid" value="{{ station_ssid }}" required></div>
+      <div class="row"><label>Station password</label>
+        <input name="station_password" value="{{ station_password }}" required></div>
 
-      <div class="row">
-        <label for="ap_password">AP-Mode Password</label>
-        <input id="ap_password" name="ap_password" type="text" value="{{ ap_password }}" required>
-      </div>
-
-      <div class="row">
-        <label for="station_ssid">Client-Mode SSID</label>
-        <input id="station_ssid" name="station_ssid" value="{{ station_ssid }}" required>
-      </div>
-
-      <div class="row">
-        <label for="station_password">Client-Mode Password</label>
-        <input id="station_password" name="station_password" type="text" value="{{ station_password }}" required>
-      </div>
-
+      <h2>LED Strip</h2>
       <div class="two-col">
-        <div class="row">
-          <label for="led_count">LED Count</label>
-          <input id="led_count" name="led_count" type="number" min="0" max="100" value="{{ led_count }}" required>
-        </div>
-        <div class="row">
-          <label for="led_brightness">LED Brightness</label>
-          <input id="led_brightness" name="led_brightness" type="number" min="0" max="255" value="{{ led_brightness }}" required>
-        </div>
+        <div class="row"><label>LED count (0..100)</label>
+          <input name="led_count" type="number" min="0" max="100" value="{{ led_count }}" required></div>
+        <div class="row"><label>Brightness (0..255)</label>
+          <input name="led_brightness" type="number" min="0" max="255" value="{{ led_brightness }}" required></div>
       </div>
 
-      <div class="button-row">
-        <button class="btn-secondary" type="submit" formaction="/test" formmethod="post">Test Led-Strip-Settings</button>
-      </div>
-      <div class="button-row">
-        <button class="btn-primary" type="submit" formaction="/">Save and Apply</button>
-      </div>
+      <button type="submit" formaction="/test" formmethod="post" class="btn-secondary">Test LED settings</button>
+      <button type="submit">Save and apply</button>
+      <div class="msg">{{ message }}</div>
     </form>
-
-    <div class="msg">{{ message }}</div>
+    <div class="links"><a href="/status-page">Status page</a> &middot; <a href="/status">Status JSON</a></div>
   </main>
 </body>
 </html>
-
